@@ -1,0 +1,43 @@
+---
+description: Waypoint architecture, module boundaries and domain rules
+alwaysApply: true
+---
+
+# Waypoint architecture
+
+Sources of truth: `docs/SYSTEM_DESIGN.md` (architecture), `docs/SRS.md` (functional requirements).
+If they are ambiguous or conflict, ask. Never invent business rules.
+
+## Stack and layout
+- TypeScript strict everywhere (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`). No `any`.
+- pnpm workspace monorepo. PostgreSQL 16.
+- `apps/web`: React + Vite PWA. `apps/api`: Fastify.
+- `packages/shared`: Zod schemas, status enums, DTOs, error codes. Use these; never redefine statuses or payloads locally.
+- `packages/planning`: pure deterministic engine. May import `packages/shared` only.
+  Never touches the database, HTTP, environment variables, `Date.now()` / `new Date()` without arguments, or browser APIs. The caller passes the current time.
+- `packages/database`: Drizzle schema, migrations, seed.
+- Do not add libraries without explaining why. Do not replace chosen technologies without permission.
+
+## API
+- HTTP route -> service -> repository. Routes never query Drizzle directly.
+- Role authorization and resource scoping are enforced server-side (`requireRole`, `scope(user)`). Frontend role checks are never security.
+- Out-of-scope records return 404, not 403.
+
+## Planning
+- Every hard constraint (SYSTEM_DESIGN §7.2) is authoritative.
+- Recommendation and allocation logic ranks feasible options only and never bypasses the validator.
+
+## Client state
+- Server data: TanStack Query. Zustand: UI state only. Driver offline data: Dexie.
+- Driver actions are local-first, synced through an idempotent outbox. Every client event has a unique `client_event_id`.
+- Never silently resolve sync conflicts.
+
+## Time
+- All operational times are interpreted in `Asia/Colombo`.
+
+## State machines
+- Use SYSTEM_DESIGN §5.3 for order, trip, stop, loading and sync states (decided over SRS §16.1 / §43).
+
+## Code
+- Small modules, reusable components. No fake APIs or mock data in production feature code.
+- Keep the app runnable after every milestone. Don't rewrite working unrelated modules.

@@ -1,0 +1,15 @@
+---
+alwaysApply: true
+---
+# Waypoint UI
+
+- Follow the supplied Figma design and `docs/DESIGN_REFERENCE.md`. Use Waypoint design tokens (`styles/tokens.css`), never raw colours.
+- shadcn/ui provides primitives, not the visual design. The app must not look like default shadcn.
+- Preserve role-specific layouts:
+  - Dispatcher: desktop-first (1440 px), information dense.
+  - Loader: tablet-first (768 px), large touch targets.
+  - Driver: mobile-first (360-414 px), one dominant action per screen, 48 px targets.
+  - Store Manager: responsive desktop and mobile.
+- Status never relies on colour alone: icon plus label, via the shared `StatusBadge`.
+- Predicted, recommended, observed, risk and hard-violation states stay visually distinct.
+- Render every time through the shared Asia/Colombo formatter.

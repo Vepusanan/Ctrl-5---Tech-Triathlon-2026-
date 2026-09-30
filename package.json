@@ -1,0 +1,40 @@
+{
+  "name": "waypoint",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @waypoint/api --filter @waypoint/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "tsc -p tsconfig.json && pnpm -r typecheck",
+    "check": "biome check .",
+    "check:write": "biome check --write .",
+    "test": "vitest run",
+    "test:planning": "vitest run --project planning",
+    "e2e": "pnpm --filter @waypoint/e2e e2e",
+    "knip": "knip",
+    "db:up": "docker compose up -d db",
+    "db:generate": "pnpm --filter @waypoint/database db:generate",
+    "db:migrate": "pnpm --filter @waypoint/database db:migrate",
+    "db:seed": "pnpm --filter @waypoint/database db:seed",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@types/node": "catalog:",
+    "husky": "^9.1.7",
+    "knip": "^6.39.0",
+    "lint-staged": "^17.6.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "lint-staged": {
+    "*": "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
+  }
+}

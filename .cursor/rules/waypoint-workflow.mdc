@@ -1,0 +1,15 @@
+---
+alwaysApply: true
+---
+# Task workflow
+
+1. Inspect existing code.
+2. Identify affected modules.
+3. Explain the implementation plan briefly.
+4. Implement.
+5. Run formatting (Biome).
+6. Run typecheck.
+7. Run relevant tests.
+8. Fix failures before stopping.
+
+`data/` holds confidential competition datasets. It is gitignored; never commit, copy into the repo, or upload its contents. CI uses synthetic fixtures.

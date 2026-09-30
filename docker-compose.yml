@@ -1,0 +1,42 @@
+x-container-database-url: &container-database-url
+  DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      retries: 20
+
+  migrate:
+    build: { context: ., dockerfile: infra/api.Dockerfile }
+    command: sh -c "node packages/database/dist/migrate.js && node packages/database/dist/seed.js"
+    env_file: .env
+    environment: *container-database-url
+    volumes: [./data:/data:ro]
+    depends_on: { db: { condition: service_healthy } }
+
+  api:
+    build: { context: ., dockerfile: infra/api.Dockerfile }
+    env_file: .env
+    environment: *container-database-url
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      retries: 20
+
+  web:
+    build: { context: ., dockerfile: infra/web.Dockerfile }
+    ports: ["${HTTP_PORT:-80}:80", "${HTTPS_PORT:-443}:443"]
+    env_file: .env
+    volumes: [caddy_data:/data]
+    depends_on: { api: { condition: service_healthy } }
+
+volumes:
+  pgdata: {}
+  caddy_data: {}

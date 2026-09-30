@@ -1,0 +1,25 @@
+# Confidential competition datasets (SYSTEM_DESIGN §12.4)
+data/*
+!data/.gitkeep
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Tests
+coverage/
+playwright-report/
+test-results/
+
+# OS / editor
+.DS_Store
+*.log
