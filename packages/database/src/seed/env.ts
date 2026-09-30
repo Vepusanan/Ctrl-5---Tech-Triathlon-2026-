@@ -1,0 +1,35 @@
+import { z } from 'zod';
+import { DEFAULT_SEED_PASSWORD } from './constants.ts';
+
+const seedEnvSchema = z.object({
+  DATA_DIR: z.string().min(1).optional(),
+  DEMO_DATE: z.iso.date().optional(),
+  SEED_PASSWORD: z.string().min(8, 'SEED_PASSWORD must be at least 8 characters').optional(),
+});
+
+export interface SeedEnv {
+  dataDir: string | undefined;
+  demoDate: string | undefined;
+  password: string;
+}
+
+export function loadSeedEnv(source: NodeJS.ProcessEnv): SeedEnv {
+  const result = seedEnvSchema.safeParse({
+    DATA_DIR: blankToUndefined(source.DATA_DIR),
+    DEMO_DATE: blankToUndefined(source.DEMO_DATE),
+    SEED_PASSWORD: blankToUndefined(source.SEED_PASSWORD),
+  });
+  if (!result.success) {
+    throw new Error(`Invalid seed environment:\n${z.prettifyError(result.error)}`);
+  }
+  return {
+    dataDir: result.data.DATA_DIR,
+    demoDate: result.data.DEMO_DATE,
+    password: result.data.SEED_PASSWORD ?? DEFAULT_SEED_PASSWORD,
+  };
+}
+
+function blankToUndefined(value: string | undefined): string | undefined {
+  if (value === undefined || value.trim().length === 0) return undefined;
+  return value.trim();
+}

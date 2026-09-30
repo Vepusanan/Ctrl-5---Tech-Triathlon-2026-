@@ -1,0 +1,39 @@
+import { index, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
+import { eventTimestamp, operationalId } from './columns.ts';
+import { issueStatusEnum, issueTypeEnum } from './enums.ts';
+import { users } from './identity.ts';
+import { orders } from './orders.ts';
+import { tripStops } from './planning.ts';
+
+export const receipts = pgTable(
+  'receipts',
+  {
+    id: operationalId(),
+    stopId: uuid('stop_id')
+      .notNull()
+      .references(() => tripStops.id),
+    confirmedBy: uuid('confirmed_by')
+      .notNull()
+      .references(() => users.id),
+    confirmedAt: eventTimestamp('confirmed_at').notNull(),
+  },
+  (table) => [
+    unique('receipts_stop_id').on(table.stopId),
+    index('receipts_confirmed_by').on(table.confirmedBy),
+  ],
+);
+
+export const issues = pgTable(
+  'issues',
+  {
+    id: operationalId(),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id),
+    type: issueTypeEnum('type').notNull(),
+    note: text('note'),
+    status: issueStatusEnum('status').notNull().default('open'),
+    createdAt: eventTimestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [index('issues_order_id').on(table.orderId)],
+);

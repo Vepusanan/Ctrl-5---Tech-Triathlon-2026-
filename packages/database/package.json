@@ -22,7 +22,9 @@
     "db:seed": "node --env-file-if-exists=../../.env --conditions=@waypoint/source src/seed.ts"
   },
   "dependencies": {
+    "@waypoint/shared": "workspace:*",
     "drizzle-orm": "^0.45.3",
+    "hash-wasm": "^4.12.0",
     "pg": "^8.23.1",
     "zod": "catalog:"
   },
@@ -30,6 +32,7 @@
     "@types/node": "catalog:",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

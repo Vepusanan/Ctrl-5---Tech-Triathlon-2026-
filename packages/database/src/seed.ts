@@ -1,15 +1,23 @@
-import { sql } from 'drizzle-orm';
 import { createDatabase } from './client.ts';
 import { loadDatabaseEnv } from './env.ts';
+import { loadSeedEnv } from './seed/env.ts';
+import { formatSeedReport } from './seed/print.ts';
+import { seedDatabase } from './seed/run.ts';
 
-const env = loadDatabaseEnv(process.env);
-const connection = createDatabase(env.DATABASE_URL, {
+const databaseEnv = loadDatabaseEnv(process.env);
+const seedEnv = loadSeedEnv(process.env);
+const connection = createDatabase(databaseEnv.DATABASE_URL, {
   onPoolError: (error) => console.error('Database pool error', error),
 });
 
 try {
-  await connection.db.execute(sql`select 1`);
-  console.log('Database reachable. No seed steps are defined yet.');
+  const result = await seedDatabase(connection.db, {
+    reset: process.argv.includes('--reset'),
+    ...(seedEnv.dataDir !== undefined ? { dataDir: seedEnv.dataDir } : {}),
+    ...(seedEnv.demoDate !== undefined ? { demoDate: seedEnv.demoDate } : {}),
+    password: seedEnv.password,
+  });
+  console.log(formatSeedReport(result));
 } finally {
   await connection.close();
 }
