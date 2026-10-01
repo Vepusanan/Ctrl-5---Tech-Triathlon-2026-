@@ -118,7 +118,10 @@ export function useBoard() {
       setServerViolations([]);
       await refresh();
     },
-    onError: (cause) => setError(message(cause)),
+    onError: (cause) => {
+      setSlots(null);
+      setError(message(cause));
+    },
   });
   const allocateAll = useMutation({
     mutationFn: async () => {
@@ -195,6 +198,10 @@ export function useBoard() {
     allocateAll,
     defer,
     refresh,
+    noteViolations(next: Violation[]) {
+      setServerViolations(next);
+      if (next.length > 0) setError('The server reported a hard constraint.');
+    },
   };
 }
 

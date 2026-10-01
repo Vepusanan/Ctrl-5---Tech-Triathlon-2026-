@@ -98,3 +98,20 @@
     grid-template-columns: 1fr;
   }
 }
+
+.dispatch-order.is-selected {
+  outline: 2px solid var(--color-border-focus);
+}
+.dispatch-why {
+  background: var(--color-status-danger-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--space-8);
+}
+.dispatch-recommendation {
+  background: var(--color-intel-recommend-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--space-8);
+}
+.dispatch-chip {
+  cursor: grab;
+}

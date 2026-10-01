@@ -31,7 +31,7 @@ export function DeferralCenter() {
   return (
     <Page
       title="Deferral center"
-      description={`${date}. A deferral needs a reason. Previous skips stay visible so the same outlet is not dropped by accident.`}
+      description={`${date}. A deferral needs a reason and is saved with POST /deferrals. There is no list endpoint, so history is the previous deferral on each queued order.`}
     >
       <Card>
         <h2>Defer an unallocated order</h2>

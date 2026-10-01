@@ -4,8 +4,9 @@ import {
   dashboardExceptionsSchema,
   dashboardSummarySchema,
 } from '@waypoint/shared';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
+  ActionList,
   CapacityBar,
   Card,
   ErrorState,
@@ -30,6 +31,7 @@ const links: Record<DashboardException['type'], string> = {
 
 export function CommandCenter() {
   const { date } = useDispatch();
+  const navigate = useNavigate();
   const summary = useQuery({
     queryKey: ['dashboard', date, 'summary'],
     queryFn: () => api(`/dashboard/summary?date=${date}`, dashboardSummarySchema),
@@ -40,8 +42,9 @@ export function CommandCenter() {
     queryFn: () => api(`/dashboard/exceptions?date=${date}`, dashboardExceptionsSchema),
     refetchInterval: 15_000,
   });
-  if (summary.isPending || exceptions.isPending)
+  if (summary.isPending || exceptions.isPending) {
     return <LoadingState label="Loading the command center…" />;
+  }
   if (!summary.data || !exceptions.data) {
     return (
       <ErrorState
@@ -58,7 +61,7 @@ export function CommandCenter() {
   return (
     <Page
       title="Operations command center"
-      description={`Service date ${date}. Counts come from the live plan, not a forecast.`}
+      description={`Service date ${date}. Counts come from the live plan. Alerts refresh from the dashboard stream, with polling if it drops.`}
     >
       <div className="store-split">
         <div className="store-metrics">
@@ -70,12 +73,10 @@ export function CommandCenter() {
           <MetricCard label="Failed stops" value={data.stops.failed} />
         </div>
         <HeroMetric
-          label="Needs action"
-          value={attention.length}
-          description={`${exceptions.data.total} exceptions · ${data.repeatDeferrals} repeat deferrals`}
-        >
-          <Link to={`/dispatch/conflicts?date=${date}`}>Open conflicts</Link>
-        </HeroMetric>
+          label="Reefer utilisation"
+          value={`${Math.round(data.utilization.reefer * 100)}%`}
+          description={`${attention.length} high-severity alerts · ${data.repeatDeferrals} repeat deferrals`}
+        />
       </div>
       <div className="store-grid-two">
         <Card>
@@ -106,38 +107,25 @@ export function CommandCenter() {
           </p>
         </Card>
       </div>
-      <Card>
-        <h2>Exceptions</h2>
-        {exceptions.data.items.length === 0 ? (
-          <p className="wp-muted">Nothing needs a decision on this date.</p>
-        ) : (
-          <ul className="dispatch-list">
-            {exceptions.data.items.map((item) => (
-              <li key={`${item.type}:${item.entityId}`}>
-                <Tag
-                  kind={
-                    item.severity === 'high'
-                      ? 'blocks-publish'
-                      : item.severity === 'medium'
-                        ? 'risk'
-                        : 'observed'
-                  }
-                />
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.reason}</p>
-                </div>
-                <Link to={`${links[item.type]}?date=${date}`}>
-                  {item.type.replaceAll('_', ' ')}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      <ActionList
+        title="Needs action"
+        items={exceptions.data.items.map((item) => ({
+          id: `${item.type}:${item.entityId}`,
+          title: item.title,
+          description: item.reason,
+          tone:
+            item.severity === 'high'
+              ? 'danger'
+              : item.severity === 'medium'
+                ? 'warning'
+                : 'neutral',
+          onClick: () => navigate(`${links[item.type]}?date=${date}`),
+        }))}
+      />
       <p className="wp-muted">
         <Tag kind="blocks-publish" /> hard violations stay separate from <Tag kind="recommended" />{' '}
-        ranked suggestions.
+        ranked suggestions. Exception links in the API point at resources, so these rows open the
+        matching workspace screen.
       </p>
     </Page>
   );

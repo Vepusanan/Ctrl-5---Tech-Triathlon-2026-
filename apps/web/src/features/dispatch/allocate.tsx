@@ -1,36 +1,33 @@
 import type { PlanningQueueItem, Violation } from '@waypoint/shared';
-import { useMemo, useState } from 'react';
+import { type DragEvent, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Button,
   CapacityBar,
-  Card,
   ErrorState,
   LoadingState,
+  RecommendationCard,
   Tag,
+  ViolationPanel,
 } from '../../components/waypoint';
 import { message } from '../../lib/api';
 import { useBoard } from './board';
-import { draftsOf, inspectDraft, placeOrder, recommendation } from './engine';
+import { draftsOf, inspectDraft, panelItems, placeOrder, recommendation } from './engine';
 import { Page, useDispatch } from './workspace';
+
+type Target = { vehicleId: string; tripNo: 1 | 2 };
 
 export function AllocationWorkspace() {
   const { date } = useDispatch();
   const board = useBoard();
   const [selected, setSelected] = useState<string | null>(null);
-  const [why, setWhy] = useState<Violation[]>([]);
+  const [attempt, setAttempt] = useState<Violation[]>([]);
+  const dragged = useRef(false);
   const placed = new Set(board.slots.flatMap((slot) => slot.orderIds));
   const queue = board.items.filter((item) => !placed.has(item.id));
-  const outletById = useMemo(
-    () => new Map((board.outlets.data?.items ?? []).map((outlet) => [outlet.id, outlet])),
-    [board.outlets.data],
-  );
-  const vehicleById = useMemo(
-    () => new Map((board.vehicles.data?.items ?? []).map((vehicle) => [vehicle.id, vehicle])),
-    [board.vehicles.data],
-  );
-  if (board.queue.isPending || board.vehicles.isPending || board.trips.isPending)
+  if (board.queue.isPending || board.vehicles.isPending || board.trips.isPending) {
     return <LoadingState label="Loading the allocation board…" />;
+  }
   if (!board.queue.data || !board.vehicles.data || !board.inputs) {
     return (
       <ErrorState
@@ -39,40 +36,38 @@ export function AllocationWorkspace() {
       />
     );
   }
-  const chosen = queue.find((item) => item.id === selected) ?? queue[0] ?? null;
-  const hint =
-    chosen && board.inputs
-      ? recommendation(chosen, outletById.get(chosen.outletId), board.slots, board.inputs.validator)
-      : null;
+  const inputs = board.inputs;
+  const chosen = queue.find((item) => item.id === selected) ?? null;
+  const outlet = chosen ? inputs.plan.outlets[chosen.outletId] : undefined;
+  const hint = chosen ? recommendation(chosen, outlet, board.slots, inputs.validator) : null;
+  const hard = attempt.length > 0 ? attempt : board.violations;
+  const vehicleById = new Map(board.vehicles.data.items.map((vehicle) => [vehicle.id, vehicle]));
 
-  function tryAssign(item: PlanningQueueItem, target: { vehicleId: string; tripNo: 1 | 2 } | null) {
-    if (!board.inputs) return;
-    const {
-      placeOrder: move,
-      inspectDraft: inspect,
-      draftsOf: asDrafts,
-    } = {
-      placeOrder,
-      inspectDraft,
-      draftsOf,
-    };
-    const next = move(board.slots, item.id, target);
-    const check = inspect(board.inputs.validator, asDrafts(next));
-    setWhy(check.violations);
+  function tryAssign(item: PlanningQueueItem, target: Target | null) {
+    const next = placeOrder(board.slots, item.id, target);
+    const check = inspectDraft(inputs.validator, draftsOf(next));
+    setAttempt(check.violations);
     if (check.inputError || check.violations.length > 0) {
       board.setError(
         check.inputError ?? 'Why not possible: a hard constraint blocks this placement.',
       );
       return;
     }
-    setWhy([]);
+    setAttempt([]);
     board.assign(item.id, target);
+  }
+
+  function readDrop(event: DragEvent, target: Target | null) {
+    event.preventDefault();
+    const id = event.dataTransfer.getData('text/plain');
+    const item = board.items.find((row) => row.id === id);
+    if (item) tryAssign(item, target);
   }
 
   return (
     <Page
       title="Allocation workspace"
-      description={`${date} · drag an order onto a vehicle trip, or choose a trip with the keyboard. Suggestions never override a hard constraint.`}
+      description={`${date} · drag an order onto a vehicle trip, or select it and use Place here. A recommendation never overrides a hard constraint.`}
     >
       <div className="dispatch-toolbar">
         <Button
@@ -82,61 +77,73 @@ export function AllocationWorkspace() {
         >
           Auto-allocate feasible plan
         </Button>
-        <Link to={`/dispatch/conflicts?date=${date}`}>Why not possible</Link>
+        <Link to={`/dispatch/conflicts?date=${date}`}>Constraint conflicts</Link>
         <Link to={`/dispatch/review?date=${date}`}>Review and publish</Link>
         {board.published && <Tag kind="blocks-publish">Published — edits are closed</Tag>}
       </div>
-      {(board.error || why.length > 0 || board.violations.length > 0) && (
-        <Card>
-          <h2>Why not possible?</h2>
-          <p className="wp-muted">
-            Hard constraints. A recommendation cannot hide or override these.
-          </p>
-          {board.error && <p role="alert">{board.error}</p>}
-          <ul className="dispatch-list">
-            {(why.length > 0 ? why : board.violations).map((item) => (
-              <li key={`${item.rule}:${item.orderId ?? 'plan'}:${item.tripKey ?? item.detail}`}>
-                <Tag kind="blocks-publish" />
-                <span>
-                  <strong>{item.rule}</strong> {item.detail}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      <div className="dispatch-why">
+        <ViolationPanel title="Why not possible?" violations={panelItems(hard)} />
+        {board.error && <p role="alert">{board.error}</p>}
+        {board.inputError && <p role="alert">{board.inputError}</p>}
+      </div>
       <div className="dispatch-board">
-        <section className="dispatch-queue" aria-label="Unallocated orders">
+        <section
+          className="dispatch-queue"
+          aria-label="Unallocated orders"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => readDrop(event, null)}
+        >
           <h2>Queue · {queue.length}</h2>
           {queue.map((item) => (
             <article
               key={item.id}
-              className="dispatch-order"
+              className={item.id === selected ? 'dispatch-order is-selected' : 'dispatch-order'}
               draggable={!board.published}
-              onDragStart={(event) => event.dataTransfer.setData('text/plain', item.id)}
+              onDragStart={(event) => {
+                dragged.current = true;
+                event.dataTransfer.setData('text/plain', item.id);
+                event.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragEnd={() => {
+                window.setTimeout(() => {
+                  dragged.current = false;
+                }, 0);
+              }}
             >
               <header>
                 <strong>{item.outletId}</strong>
                 <Tag kind={item.temp === 'chilled' ? 'chilled' : 'ambient'} />
                 {item.outlet.parkingConstraint === 'van_only' && <Tag kind="van-only" />}
+                {item.outlet.mallWindow && <Tag kind="mall-window" />}
               </header>
               <p>
-                {item.brand} · {item.weightKg} kg · {item.volumeM3} m³
+                {item.brand} · {item.weightKg} kg · {item.volumeM3} m³ · {item.outlet.window.open}–
+                {item.outlet.window.close}
               </p>
+              <Button
+                variant={item.id === selected ? 'primary' : 'secondary'}
+                aria-pressed={item.id === selected}
+                onClick={() => {
+                  if (dragged.current) return;
+                  setSelected(item.id);
+                }}
+              >
+                {item.id === selected ? 'Selected' : 'Select'}
+              </Button>
               <label>
-                Move with keyboard
+                Keyboard placement
                 <select
                   value=""
                   aria-label={`Assign ${item.outletId}`}
                   onFocus={() => setSelected(item.id)}
                   onChange={(event) => {
                     const value = event.target.value;
-                    if (!value) return;
                     if (value === 'queue') tryAssign(item, null);
-                    else {
+                    else if (value) {
                       const [vehicleId, trip] = value.split(':');
-                      if (vehicleId && (trip === '1' || trip === '2'))
+                      if (vehicleId && (trip === '1' || trip === '2')) {
                         tryAssign(item, { vehicleId, tripNo: trip === '1' ? 1 : 2 });
+                      }
                     }
                     event.target.value = '';
                   }}
@@ -170,12 +177,9 @@ export function AllocationWorkspace() {
                 className="dispatch-column"
                 aria-label={`${slot.vehicleId} trip ${slot.tripNo} drop target`}
                 onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  const id = event.dataTransfer.getData('text/plain');
-                  const item = board.items.find((row) => row.id === id);
-                  if (item) tryAssign(item, { vehicleId: slot.vehicleId, tripNo: slot.tripNo });
-                }}
+                onDrop={(event) =>
+                  readDrop(event, { vehicleId: slot.vehicleId, tripNo: slot.tripNo })
+                }
               >
                 <header>
                   <Link to={`/dispatch/vehicles/${slot.vehicleId}?date=${date}`}>
@@ -184,6 +188,7 @@ export function AllocationWorkspace() {
                   <span>Trip {slot.tripNo}</span>
                   {vehicle?.temp === 'reefer' && <Tag kind="reefer" />}
                   {vehicle?.type === 'van' && <Tag kind="van" />}
+                  {vehicle?.temp === 'ambient' && <Tag kind="dry-box" />}
                 </header>
                 {vehicle && (
                   <>
@@ -201,14 +206,34 @@ export function AllocationWorkspace() {
                     />
                   </>
                 )}
+                <Button
+                  variant="secondary"
+                  disabled={!chosen || board.published || !board.online}
+                  onClick={() => {
+                    if (chosen)
+                      tryAssign(chosen, { vehicleId: slot.vehicleId, tripNo: slot.tripNo });
+                  }}
+                >
+                  Place selected here
+                </Button>
                 {orders.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     className="dispatch-chip"
-                    onClick={() => tryAssign(item, null)}
+                    draggable={!board.published}
+                    onDragStart={(event) => {
+                      dragged.current = true;
+                      event.dataTransfer.setData('text/plain', item.id);
+                    }}
+                    onClick={() => {
+                      if (dragged.current) return;
+                      tryAssign(item, null);
+                    }}
                   >
-                    {item.outletId} · {item.weightKg} kg
+                    {item.outletId} · {item.temp === 'chilled' ? 'chilled' : 'dry'} ·{' '}
+                    {item.weightKg} kg
+                    {item.outlet.parkingConstraint === 'van_only' ? ' · van only' : ''}
                   </button>
                 ))}
               </section>
@@ -217,31 +242,35 @@ export function AllocationWorkspace() {
         </div>
       </div>
       {chosen && hint && (
-        <Card>
-          <h2>Recommendation · not a decision</h2>
-          <p>
-            <Tag kind="recommended" /> Priority score {hint.score.total.toFixed(0)} for{' '}
-            {chosen.outletId}. {hint.checked} vehicle trips pass every hard constraint.
-          </p>
-          {hint.feasible ? (
-            <Button
-              variant="secondary"
-              disabled={board.published}
-              onClick={() => {
-                const target = hint.feasible;
-                if (target)
-                  tryAssign(chosen, { vehicleId: target.vehicleId, tripNo: target.tripNo });
-              }}
-            >
-              Use {hint.feasible.vehicleId} trip {hint.feasible.tripNo}
-            </Button>
-          ) : (
-            <p>
-              <Tag kind="blocks-publish" /> No feasible trip. The score does not create an
-              exception.
-            </p>
-          )}
-        </Card>
+        <div className="dispatch-recommendation">
+          <RecommendationCard
+            title={`Recommendation for ${chosen.outletId}`}
+            description={
+              hint.feasible
+                ? `Priority score ${hint.score.total.toFixed(0)}. ${hint.checked} trips pass every hard constraint. Accepting still re-checks the plan before anything is saved.`
+                : `Priority score ${hint.score.total.toFixed(0)}. No trip passes validation, so this score cannot place the order.`
+            }
+            reasons={[
+              `Deferred yesterday ${hint.score.deferredYesterday}`,
+              `Days since served ${hint.score.daysSinceLastServed}`,
+              `Chilled ${hint.score.chilled}`,
+              `Fresh before 08:00 ${hint.score.freshBefore8}`,
+              `Tight window ${hint.score.tightWindow}`,
+              'These weights rank the queue. They are not an exception to a hard constraint.',
+            ]}
+            {...(hint.feasible && !board.published && board.online
+              ? {
+                  onAccept: () => {
+                    const target = hint.feasible;
+                    if (target) {
+                      tryAssign(chosen, { vehicleId: target.vehicleId, tripNo: target.tripNo });
+                    }
+                  },
+                }
+              : {})}
+            onReject={() => setSelected(null)}
+          />
+        </div>
       )}
     </Page>
   );

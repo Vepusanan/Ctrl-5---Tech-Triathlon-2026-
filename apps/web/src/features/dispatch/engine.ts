@@ -149,3 +149,22 @@ export function violationsFor(
       (item.orderId === undefined && item.vehicleId === undefined),
   );
 }
+
+export function panelItems(violations: Violation[]) {
+  return violations.map((item, index) => ({
+    id: `${item.rule}:${item.orderId ?? 'plan'}:${item.tripKey ?? ''}:${item.vehicleId ?? ''}:${index}`,
+    title: item.rule.replaceAll('_', ' '),
+    description: [
+      item.detail,
+      item.orderId ? `Order ${item.orderId}` : null,
+      item.vehicleId ? `Vehicle ${item.vehicleId}` : null,
+      item.tripKey ? `Trip ${item.tripKey}` : null,
+      item.actual !== undefined && item.limit !== undefined
+        ? `Actual ${item.actual} · limit ${item.limit}`
+        : null,
+    ]
+      .filter((part) => part !== null)
+      .join(' · '),
+    severity: 'danger' as const,
+  }));
+}

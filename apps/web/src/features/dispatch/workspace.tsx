@@ -21,6 +21,7 @@ import { LiveOperations } from './live';
 import { PlanningQueuePage } from './queue';
 import { ReviewPublish } from './review';
 import { WhatIfSimulator } from './simulate';
+import { useDashboardStream } from './stream';
 import './dispatch.css';
 
 type Dispatcher = Extract<User, { role: 'dispatcher' }>;
@@ -174,6 +175,7 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
   const requested = params.get('date');
   const date = requested && dates.includes(requested) ? requested : (dates.at(-1) ?? '');
   const online = useOnline();
+  useDashboardStream(date, online && date.length > 0);
   const location = useLocation();
   const setDate = (next: string) => {
     const query = new URLSearchParams(params);

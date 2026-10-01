@@ -1,45 +1,39 @@
-import { Tag } from '../../components/waypoint';
+import { Card, ErrorState, LoadingState, Tag, ViolationPanel } from '../../components/waypoint';
+import { message } from '../../lib/api';
 import { useBoard } from './board';
+import { panelItems } from './engine';
 import { Page, useDispatch } from './workspace';
 
 export function ConstraintPanel() {
   const { date } = useDispatch();
   const board = useBoard();
-  const grouped = new Map<string, string[]>();
-  for (const item of board.violations) {
-    const list = grouped.get(item.rule) ?? [];
-    list.push(item.detail);
-    grouped.set(item.rule, list);
+  if (board.queue.isPending || board.vehicles.isPending) {
+    return <LoadingState label="Checking the draft against the planning rules…" />;
+  }
+  if (!board.queue.data) {
+    return (
+      <ErrorState description={message(board.queue.error)} onRetry={() => void board.refresh()} />
+    );
   }
   return (
     <Page
       title="Constraint conflicts"
-      description={`${date}. Hard violations block publish. Recommendations are a separate, non-binding rank.`}
+      description={`${date}. Hard violations block publish. A recommendation is a separate rank and cannot clear them.`}
     >
       {board.inputError && <p role="alert">{board.inputError}</p>}
-      {[...grouped.entries()].length === 0 ? (
-        <p className="wp-muted">
-          The current draft has no hard violations from the planning validator.
+      <div className="dispatch-why">
+        <ViolationPanel title="Hard constraints" violations={panelItems(board.violations)} />
+      </div>
+      <Card className="dispatch-recommendation">
+        <h2>
+          <Tag kind="recommended" /> Advisory only
+        </h2>
+        <p>
+          Priority scores suggest a trip on the allocation board. Accept stays disabled whenever the
+          planning validator reports a violation, on the client and again before the server saves
+          the move.
         </p>
-      ) : (
-        <ul className="dispatch-list">
-          {[...grouped.entries()].map(([rule, details]) => (
-            <li key={rule}>
-              <Tag kind="blocks-publish" />
-              <div>
-                <strong>{rule}</strong>
-                {details.map((detail) => (
-                  <p key={detail}>{detail}</p>
-                ))}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      <p>
-        <Tag kind="recommended" /> A feasible suggestion may be shown on the allocation board. It is
-        disabled whenever validation reports a violation.
-      </p>
+      </Card>
     </Page>
   );
 }

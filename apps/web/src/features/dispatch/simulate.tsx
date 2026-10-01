@@ -25,18 +25,28 @@ export function WhatIfSimulator() {
   const [version, setVersion] = useState<number | null>(null);
   const run = useMutation({
     mutationFn: async () => {
+      const parsed = Number(factor);
+      if (scenario === 'fresh_demand' && !(parsed > 1)) {
+        throw new Error('Fresh demand must be a factor greater than 1. Nothing was simulated.');
+      }
+      if (scenario === 'vehicle_unavailable' && vehicleId.length === 0) {
+        throw new Error('Choose a vehicle. The active plan was not changed.');
+      }
       const before = await api(`/planning/runs/${date}/queue`, planningQueueResponseSchema);
       const body =
         scenario === 'vehicle_unavailable'
           ? { changes: [{ type: 'vehicle_unavailable' as const, vehicleId }] }
           : scenario === 'extra_reefer'
             ? { changes: [{ type: 'extra_reefer' as const }] }
-            : { changes: [{ type: 'fresh_demand' as const, factor: Number(factor) }] };
+            : { changes: [{ type: 'fresh_demand' as const, factor: parsed }] };
       const result = await api(`/planning/runs/${date}/simulate`, simulatePlanResponseSchema, {
         method: 'POST',
         body: JSON.stringify(body),
       });
       const after = await api(`/planning/runs/${date}/queue`, planningQueueResponseSchema);
+      if (after.planVersion !== before.planVersion) {
+        throw new Error('Simulation changed the plan version. Refresh before planning again.');
+      }
       return { result, before: before.planVersion, after: after.planVersion };
     },
     onSuccess: (data) => setVersion(data.after),
@@ -123,6 +133,11 @@ function Metrics({
     deferredVolumeM3: number;
     fuelUsedL: number;
     tightWindowStops: number;
+    repeatDeferrals: number;
+    avgWeightUtilization: number;
+    avgVolumeUtilization: number;
+    reeferUtilization: number;
+    vanUtilization: number;
   };
 }) {
   return (
