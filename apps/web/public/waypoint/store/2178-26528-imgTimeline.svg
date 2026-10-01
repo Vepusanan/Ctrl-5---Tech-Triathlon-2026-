@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="640" height="36" viewBox="0 0 640 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>Timeline</title>
+<g id="timeline">
+<path id="Rectangle" d="M0 15C0 13.3431 1.34315 12 3 12H637C638.657 12 640 13.3431 640 15V15C640 16.6569 638.657 18 637 18H2.99999C1.34314 18 0 16.6569 0 15V15Z" fill="#F7F7F5"/>
+<path id="Rectangle_2" d="M199 8.5H505C508.59 8.5 511.5 11.4102 511.5 15C511.5 18.5899 508.59 21.5 505 21.5H199C195.41 21.5 192.5 18.5898 192.5 15C192.5 11.4101 195.41 8.5 199 8.5Z" fill="#DCF6E9" stroke="#3ED598"/>
+<circle id="Ellipse" cx="267" cy="15" r="7" fill="#0F0F0F"/>
+<path id="Rectangle_3" d="M196 15C196 13.3431 197.343 12 199 12H221C222.657 12 224 13.3431 224 15V15C224 16.6569 222.657 18 221 18H199C197.343 18 196 16.6569 196 15V15Z" fill="#2A50C8"/>
+</g>
+</svg>

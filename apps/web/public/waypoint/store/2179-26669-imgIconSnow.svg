@@ -1,0 +1,16 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>Snow</title>
+<g id="icon/snow" clip-path="url(#clip0_0_263)">
+<path id="Vector" d="M1 6H11" stroke="#0A6A9E" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M6 1V11" stroke="#0A6A9E" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M10 8L8 6L10 4" stroke="#0A6A9E" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_4" d="M2 4L4 6L2 8" stroke="#0A6A9E" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_5" d="M8 2L6 4L4 2" stroke="#0A6A9E" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_6" d="M4 10L6 8L8 10" stroke="#0A6A9E" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<defs>
+<clipPath id="clip0_0_263">
+<rect width="12" height="12" fill="white"/>
+</clipPath>
+</defs>
+</svg>

@@ -1,0 +1,100 @@
+.dispatch-workspace .wp-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+.dispatch-date input {
+  min-height: 36px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-12);
+  background: var(--color-bg-surface);
+}
+.dispatch-filters,
+.dispatch-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  align-items: end;
+}
+.dispatch-filters label,
+.dispatch-toolbar label,
+.store-form label {
+  display: grid;
+  gap: var(--space-4);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.dispatch-filters select,
+.store-form select,
+.store-form textarea,
+.dispatch-order select {
+  min-height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-field);
+  background: var(--color-bg-surface);
+  padding: 8px 12px;
+}
+.dispatch-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.dispatch-board {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: var(--space-16);
+  align-items: start;
+}
+.dispatch-columns {
+  display: flex;
+  gap: var(--space-12);
+  overflow-x: auto;
+  padding-bottom: var(--space-8);
+}
+.dispatch-column,
+.dispatch-order {
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-12);
+  box-shadow: var(--shadow-ambient);
+}
+.dispatch-column {
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.dispatch-queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.dispatch-order header,
+.dispatch-column header,
+.dispatch-list li {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  justify-content: space-between;
+}
+.dispatch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+.dispatch-chip {
+  text-align: left;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-bg-subtle);
+  padding: var(--space-8);
+}
+@media (max-width: 1100px) {
+  .dispatch-board {
+    grid-template-columns: 1fr;
+  }
+}

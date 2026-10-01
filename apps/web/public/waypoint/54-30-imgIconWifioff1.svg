@@ -1,0 +1,17 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>Wifi off</title>
+<g id="icon/wifioff" clip-path="url(#clip0_0_160)">
+<path id="Vector" d="M6 10H6.005" stroke="#5C5C5C" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M4.25 8.215C4.71732 7.75693 5.34562 7.50036 6 7.50036C6.65438 7.50036 7.28268 7.75693 7.75 8.215" stroke="#5C5C5C" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M1 4.41C1.61698 3.85612 2.32154 3.40838 3.085 3.085" stroke="#5C5C5C" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_4" d="M5.33 2.5C7.335 2.32 9.4 2.95 11 4.38" stroke="#5C5C5C" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_5" d="M8.425 5.625C8.83236 5.85187 9.20598 6.13461 9.535 6.465" stroke="#5C5C5C" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_6" d="M2.5 6.5C3.21396 5.78601 4.12736 5.3049 5.12 5.12" stroke="#5C5C5C" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_7" d="M1 1L11 11" stroke="#5C5C5C" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<defs>
+<clipPath id="clip0_0_160">
+<rect width="12" height="12" fill="white"/>
+</clipPath>
+</defs>
+</svg>
