@@ -2,6 +2,8 @@ import {
   allocationResponseSchema,
   apiErrorSchema,
   autoAllocateResponseSchema,
+  createDeferralRequestSchema,
+  deferralSchema,
   ifMatchHeadersSchema,
   moveAllocationRequestSchema,
   planningQueueResponseSchema,
@@ -102,6 +104,28 @@ export const planningRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request) =>
       service.move(request.user, request.params.date, request.headers['if-match'], request.body),
+  );
+
+  app.post(
+    '/deferrals',
+    {
+      preHandler: app.requireRole('dispatcher'),
+      schema: {
+        tags: ['planning'],
+        headers: ifMatchHeadersSchema,
+        body: createDeferralRequestSchema,
+        response: {
+          200: deferralSchema,
+          400: apiErrorSchema,
+          401: apiErrorSchema,
+          403: apiErrorSchema,
+          404: apiErrorSchema,
+          409: apiErrorSchema,
+          422: apiErrorSchema,
+        },
+      },
+    },
+    async (request) => service.defer(request.user, request.headers['if-match'], request.body),
   );
 
   app.post(

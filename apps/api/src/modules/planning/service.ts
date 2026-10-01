@@ -10,6 +10,8 @@ import {
 import type {
   AllocationResponse,
   AutoAllocateResponse,
+  CreateDeferralRequest,
+  Deferral,
   MoveAllocationRequest,
   PlanInput,
   PlanningQueueResponse,
@@ -69,6 +71,7 @@ export interface PlanningService {
     version: number,
     input: MoveAllocationRequest,
   ): Promise<AllocationResponse>;
+  defer(user: User | null, version: number, input: CreateDeferralRequest): Promise<Deferral>;
   simulate(
     user: User | null,
     serviceDate: string,
@@ -256,6 +259,117 @@ export function createPlanningService(
           });
           pending.push(planningEvent('allocation.changed', dispatcher.id, now, context, run.id));
           return { ...result, planVersion: next.planVersion };
+        },
+      );
+    },
+
+    async defer(user, version, input) {
+      return withOpenRun(
+        db,
+        repo,
+        events,
+        clock,
+        user,
+        input.serviceDate,
+        version,
+        async (tx, dispatcher, run, context, pending, now) => {
+          const order = context.orders.find((row) => row.id === input.orderId);
+          if (order === undefined) throw new ApiError('NOT_FOUND', MISSING_ORDER);
+          const current = await repo.listDrafts(tx, run.id);
+          assertKnownOrders(current, eligibleIds(context), 'changed');
+          const drafts = applyMove(current, input.orderId, null);
+          rejectSplits(drafts);
+          const violations = validatePlan(
+            validatorInput(context, draftsReferencing(context, drafts)),
+            drafts,
+          );
+          if (violations.length > 0) throw constraint(violations);
+          const result = planFromEngine(() => describeAssignment(context.plan, drafts));
+          const classified = result.deferred.find((item) => item.orderId === input.orderId);
+          if (classified === undefined) {
+            throw new ApiError('INTERNAL_ERROR', 'Planning engine did not defer the order');
+          }
+          if (classified.reason !== input.reasonCode || classified.type !== input.type) {
+            throw new ApiError('CONSTRAINT_VIOLATION', classified.explain, [
+              {
+                rule: classified.reason,
+                orderId: classified.orderId,
+                detail: classified.explain,
+              },
+            ]);
+          }
+          await repo.replaceTrips(tx, run.id, storedFrom(result, 'planned'));
+          const note =
+            input.note === undefined ? classified.explain : `${classified.explain} ${input.note}`;
+          const ids = await repo.insertDeferrals(tx, run.id, [
+            {
+              orderId: order.id,
+              reasonCode: classified.reason,
+              type: classified.type,
+              note,
+              actorId: dispatcher.id,
+              createdAt: now,
+            },
+          ]);
+          const deferralId = ids[0];
+          if (deferralId === undefined) {
+            throw new ApiError('INTERNAL_ERROR', 'Deferral was not created');
+          }
+          orderStateMachine.assertTransition('confirmed', 'deferred');
+          await repo.markOrders(tx, [{ id: order.id, status: 'deferred' }]);
+          const managers = await repo.listStoreManagers(tx, [order.outletId]);
+          await repo.insertNotifications(
+            tx,
+            managers.map((manager) => ({
+              recipientId: manager.id,
+              type: 'order_deferred' as const,
+              priority: 'high' as const,
+              entityType: 'order' as const,
+              entityId: order.id,
+              createdAt: now,
+            })),
+          );
+          const next = await bump(repo, tx, run);
+          await audit.record(tx, {
+            actorId: dispatcher.id,
+            role: dispatcher.role,
+            action: 'order.deferred',
+            entityType: 'order',
+            entityId: order.id,
+            before: {
+              status: 'confirmed',
+              planVersion: run.planVersion,
+              ...draftSnapshot(current),
+            },
+            after: {
+              status: 'deferred',
+              planVersion: next.planVersion,
+              reasonCode: classified.reason,
+              type: classified.type,
+              explain: classified.explain,
+              runId: run.id,
+            },
+            createdAt: now,
+          });
+          if (!sameDrafts(current, drafts)) {
+            pending.push(planningEvent('allocation.changed', dispatcher.id, now, context, run.id));
+          }
+          pending.push({
+            ...planningEvent('order.deferred', dispatcher.id, now, context, run.id),
+            type: 'order.deferred',
+            orderId: order.id,
+            outletId: order.outletId,
+          });
+          return {
+            id: deferralId,
+            orderId: order.id,
+            runId: run.id,
+            reasonCode: classified.reason,
+            type: classified.type,
+            note,
+            actorId: dispatcher.id,
+            createdAt: formatColomboTimestamp(now),
+          };
         },
       );
     },
@@ -677,6 +791,20 @@ function planningEvent(
     serviceDate: context.serviceDate,
     runId,
   };
+}
+
+function sameDrafts(left: readonly TripDraft[], right: readonly TripDraft[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((trip, index) => {
+    const other = right[index];
+    if (other === undefined) return false;
+    return (
+      trip.vehicleId === other.vehicleId &&
+      trip.tripNo === other.tripNo &&
+      trip.orderIds.length === other.orderIds.length &&
+      trip.orderIds.every((orderId, stop) => orderId === other.orderIds[stop])
+    );
+  });
 }
 
 function draftSnapshot(drafts: readonly TripDraft[]): Record<string, unknown> {

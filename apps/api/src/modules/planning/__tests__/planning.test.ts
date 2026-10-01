@@ -20,19 +20,22 @@ import {
 import {
   autoAllocateResponseSchema,
   currentUserResponseSchema,
+  deferralSchema,
   draftPlanResponseSchema,
   planningQueueResponseSchema,
   publishPlanResponseSchema,
   simulatePlanResponseSchema,
   type User,
 } from '@waypoint/shared';
-import { count, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import { argon2id } from 'hash-wasm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { client, cookiePair, SESSION_SECRET } from '../../../../test/http.ts';
 import { createMigratedDatabase } from '../../../../test/postgres.ts';
 import { buildApp } from '../../../app.ts';
 import type { DomainEvent } from '../../../plugins/domain-events.ts';
+import { createPlanningRepo, type PlanningRepo } from '../repo.ts';
+import { createPlanningService } from '../service.ts';
 
 const SERVICE_DATE = '2026-10-07';
 const PINNED = '2026-10-06T10:00:00.000+05:30';
@@ -160,6 +163,17 @@ describe('planning', () => {
         url: `/api/v1/planning/runs/${SERVICE_DATE}/allocations`,
         headers: { 'if-match': '0' },
         payload: { orderId, target: null },
+      },
+      {
+        method: 'POST' as const,
+        url: '/api/v1/deferrals',
+        headers: { 'if-match': '0' },
+        payload: {
+          orderId,
+          serviceDate: SERVICE_DATE,
+          reasonCode: 'WEIGHT_CAP',
+          type: 'unavoidable',
+        },
       },
       {
         method: 'POST' as const,
@@ -402,6 +416,27 @@ describe('planning', () => {
     const fuel = await database.db.select().from(fuelLedger);
     expect(fuel.length).toBe(tripRows.length);
     expect(fuel.every((row) => row.litres > 0)).toBe(true);
+    const notes = await database.db.select().from(notifications);
+    const store = await database.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, 'planning.store@waypoint.test'));
+    expect(notes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          recipientId: store[0]?.id,
+          type: 'order_deferred',
+          priority: 'high',
+          entityType: 'order',
+          entityId: deferred,
+        }),
+        expect.objectContaining({
+          type: 'plan_published',
+          priority: 'high',
+          entityType: 'trip',
+        }),
+      ]),
+    );
     const statuses = await database.db
       .select({ id: orders.id, status: orders.status })
       .from(orders);
@@ -444,11 +479,181 @@ describe('planning', () => {
     expect(run[0]?.planVersion).toBe(1);
     expect(await database.db.select().from(fuelLedger)).toEqual([]);
     expect(await database.db.select().from(deferrals)).toEqual([]);
+    expect(await database.db.select().from(notifications)).toEqual([]);
+    const publishedAudit = (await database.db.select().from(auditLog)).filter(
+      (row) => row.entityId === run[0]?.id && row.action === 'plan.published',
+    );
+    expect(publishedAudit).toEqual([]);
     const tripRows = await database.db.select({ status: trips.status }).from(trips);
     expect(tripRows.every((trip) => trip.status === 'planned')).toBe(true);
     const order = await database.db.select({ status: orders.status }).from(orders);
     expect(order[0]?.status).toBe('confirmed');
     expect(orderId).toBeTruthy();
+  });
+
+  it('rolls back trips, stops, deferrals and fuel when publish fails after they are staged', async () => {
+    const orderId = await insertOrder();
+    const allocated = await app.inject({
+      method: 'POST',
+      url: `/api/v1/planning/runs/${SERVICE_DATE}/auto-allocate`,
+      headers: { cookie: dispatcher.cookie, 'if-match': '0' },
+    });
+    expect(allocated.statusCode).toBe(200);
+    const before = await snapshot();
+    const tripIds = (await database.db.select({ id: trips.id }).from(trips)).map((row) => row.id);
+    const base = createPlanningRepo();
+    const failing: PlanningRepo = {
+      ...base,
+      async insertFuel(db, rows) {
+        await base.insertFuel(db, rows);
+        throw new Error('forced publish failure');
+      },
+    };
+    const service = createPlanningService(
+      database.db,
+      app.audit,
+      app.domainEvents,
+      app.clock,
+      failing,
+    );
+    const seen: DomainEvent[] = [];
+    const stop = app.domainEvents.subscribe((event) => {
+      seen.push(event);
+    });
+    await expect(service.publish(dispatcher.user, SERVICE_DATE, 1)).rejects.toThrow(
+      'forced publish failure',
+    );
+    stop();
+    expect(seen).toEqual([]);
+    expect(await snapshot()).toEqual(before);
+    expect((await database.db.select({ id: trips.id }).from(trips)).map((row) => row.id)).toEqual(
+      tripIds,
+    );
+    const run = await database.db.select().from(planningRuns);
+    expect(run[0]?.status).toBe('open');
+    expect(run[0]?.planVersion).toBe(1);
+    expect(await database.db.select().from(fuelLedger)).toEqual([]);
+    expect(await database.db.select().from(deferrals)).toEqual([]);
+    expect(await database.db.select().from(notifications)).toEqual([]);
+    const stored = await database.db.select({ id: orders.id, status: orders.status }).from(orders);
+    expect(stored).toEqual([{ id: orderId, status: 'confirmed' }]);
+    const tripRows = await database.db.select({ status: trips.status }).from(trips);
+    expect(tripRows.every((trip) => trip.status === 'planned')).toBe(true);
+  });
+
+  it('records a dispatcher deferral from the planning engine and leaves the queue', async () => {
+    const orderId = await insertOrder({ weightKg: 5_000 });
+    const kept = await insertOrder();
+    const assigned = await allocate(0, {
+      orderId: kept,
+      target: { vehicleId: 'VEH201', tripNo: 1 },
+    });
+    expect(assigned.statusCode).toBe(200);
+    const mismatched = await app.inject({
+      method: 'POST',
+      url: '/api/v1/deferrals',
+      headers: { cookie: dispatcher.cookie, 'if-match': '1' },
+      payload: {
+        orderId,
+        serviceDate: SERVICE_DATE,
+        reasonCode: 'FUEL_QUOTA',
+        type: 'prioritized',
+      },
+    });
+    expectViolation(mismatched, 'WEIGHT_CAP');
+    expect(await database.db.select().from(deferrals)).toEqual([]);
+    expect(await database.db.select().from(notifications)).toEqual([]);
+
+    const seen: DomainEvent[] = [];
+    const stop = app.domainEvents.subscribe((event) => {
+      seen.push(event);
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/deferrals',
+      headers: { cookie: dispatcher.cookie, 'if-match': '1' },
+      payload: {
+        orderId,
+        serviceDate: SERVICE_DATE,
+        reasonCode: 'WEIGHT_CAP',
+        type: 'unavoidable',
+        note: 'Hold for tomorrow',
+      },
+    });
+    stop();
+    expect(response.statusCode).toBe(200);
+    const body = deferralSchema.parse(response.json());
+    const store = await database.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, 'planning.store@waypoint.test'));
+    expect(body).toMatchObject({
+      orderId,
+      reasonCode: 'WEIGHT_CAP',
+      type: 'unavoidable',
+      actorId: dispatcher.user.id,
+      createdAt: PINNED,
+    });
+    expect(body.note).toContain('Hold for tomorrow');
+    const stored = await database.db.select().from(deferrals);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.orderId).toBe(orderId);
+    const statuses = await database.db
+      .select({ id: orders.id, status: orders.status })
+      .from(orders);
+    expect(statuses).toEqual(
+      expect.arrayContaining([
+        { id: orderId, status: 'deferred' },
+        { id: kept, status: 'confirmed' },
+      ]),
+    );
+    const keptStops = await database.db.select({ orderId: tripStops.orderId }).from(tripStops);
+    expect(keptStops.map((stopRow) => stopRow.orderId)).toEqual([kept]);
+    const run = await database.db.select().from(planningRuns);
+    expect(run[0]?.status).toBe('open');
+    expect(run[0]?.planVersion).toBe(2);
+    expect(await database.db.select().from(fuelLedger)).toEqual([]);
+    const notes = await database.db.select().from(notifications);
+    expect(notes).toEqual([
+      expect.objectContaining({
+        recipientId: store[0]?.id,
+        type: 'order_deferred',
+        priority: 'high',
+        entityId: orderId,
+      }),
+    ]);
+    const audit = await database.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.action, 'order.deferred'), eq(auditLog.entityId, orderId)));
+    expect(audit).toHaveLength(1);
+    expect(audit[0]?.after).toMatchObject({ reasonCode: 'WEIGHT_CAP', type: 'unavoidable' });
+    expect(seen.map((event) => event.type)).toEqual(['order.deferred']);
+    const queue = planningQueueResponseSchema.parse(
+      json(
+        await app.inject({
+          method: 'GET',
+          url: `/api/v1/planning/runs/${SERVICE_DATE}/queue`,
+          headers: { cookie: dispatcher.cookie },
+        }),
+        200,
+      ),
+    );
+    expect(queue.items.map((item) => item.id)).toEqual([kept]);
+    expect(queue.planVersion).toBe(2);
+
+    const stale = await app.inject({
+      method: 'POST',
+      url: '/api/v1/deferrals',
+      headers: { cookie: dispatcher.cookie, 'if-match': '1' },
+      payload: {
+        orderId: kept,
+        serviceDate: SERVICE_DATE,
+        reasonCode: 'VOLUME_CAP',
+        type: 'prioritized',
+      },
+    });
+    expect(stale.statusCode).toBe(409);
   });
 
   it('returns 409 when the plan version is stale', async () => {

@@ -209,7 +209,7 @@ export interface PlanningRepo {
   lockRun(db: PlanningDb, depotId: string, serviceDate: string): Promise<PlanningRunRow>;
   listDrafts(db: PlanningDb, runId: string): Promise<DraftTrip[]>;
   replaceTrips(db: PlanningDb, runId: string, trips: readonly StoredTrip[]): Promise<string[]>;
-  insertDeferrals(db: PlanningDb, runId: string, rows: readonly DeferralDraft[]): Promise<void>;
+  insertDeferrals(db: PlanningDb, runId: string, rows: readonly DeferralDraft[]): Promise<string[]>;
   insertFuel(db: PlanningDb, rows: readonly FuelWrite[]): Promise<void>;
   lockOrders(db: PlanningDb, ids: readonly string[]): Promise<Map<string, OrderStatus>>;
   markOrders(db: PlanningDb, rows: readonly OrderStatusWrite[]): Promise<void>;
@@ -548,18 +548,22 @@ export function createPlanningRepo(): PlanningRepo {
     },
 
     async insertDeferrals(db, runId, rows) {
-      if (rows.length === 0) return;
-      await db.insert(deferrals).values(
-        rows.map((row) => ({
-          orderId: row.orderId,
-          runId,
-          reasonCode: row.reasonCode,
-          type: row.type,
-          note: row.note,
-          actorId: row.actorId,
-          createdAt: row.createdAt,
-        })),
-      );
+      if (rows.length === 0) return [];
+      const inserted = await db
+        .insert(deferrals)
+        .values(
+          rows.map((row) => ({
+            orderId: row.orderId,
+            runId,
+            reasonCode: row.reasonCode,
+            type: row.type,
+            note: row.note,
+            actorId: row.actorId,
+            createdAt: row.createdAt,
+          })),
+        )
+        .returning({ id: deferrals.id });
+      return inserted.map((row) => row.id);
     },
 
     async insertFuel(db, rows) {
