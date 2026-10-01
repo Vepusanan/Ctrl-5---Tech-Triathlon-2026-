@@ -10,6 +10,7 @@ import {
 import {
   depotIdSchema,
   districtSchema,
+  isoDateSchema,
   outletIdSchema,
   timeOfDaySchema,
   vehicleIdSchema,
@@ -63,3 +64,24 @@ export const serviceAllowanceSchema = z.object({
   minutes: z.number().nonnegative(),
 });
 export type ServiceAllowance = z.infer<typeof serviceAllowanceSchema>;
+
+export const depotSchema = z.object({
+  id: depotIdSchema,
+  name: z.string().min(1),
+});
+export type Depot = z.infer<typeof depotSchema>;
+
+// calendar.csv numbers Monday as 0. festivalRamp is the dataset coefficient, from 0 to 1.
+export const calendarDaySchema = z.object({
+  date: isoDateSchema,
+  dow: z.int().min(0).max(6),
+  isoYear: z.int().positive(),
+  isoWeek: z.int().min(1).max(53),
+  isPayday: z.boolean(),
+  festival: z.string().min(1).nullable(),
+  festivalRamp: z.number().min(0).max(1),
+  isHoliday: z.boolean(),
+  monsoon: z.boolean(),
+  isOperating: z.boolean(),
+});
+export type CalendarDay = z.infer<typeof calendarDaySchema>;

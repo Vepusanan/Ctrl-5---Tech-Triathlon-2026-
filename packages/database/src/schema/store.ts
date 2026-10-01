@@ -33,7 +33,13 @@ export const issues = pgTable(
     type: issueTypeEnum('type').notNull(),
     note: text('note'),
     status: issueStatusEnum('status').notNull().default('open'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
     createdAt: eventTimestamp('created_at').notNull().defaultNow(),
   },
-  (table) => [index('issues_order_id').on(table.orderId)],
+  (table) => [
+    index('issues_order_id').on(table.orderId),
+    index('issues_created_by').on(table.createdBy),
+  ],
 );

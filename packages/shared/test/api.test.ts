@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
   apiErrorSchema,
+  auditTimelineSchema,
   createOrderRequestSchema,
+  dashboardExceptionSchema,
+  dashboardStreamMessageSchema,
+  dashboardSummarySchema,
   errorCodeSchema,
   httpStatusByErrorCode,
   ifMatchHeadersSchema,
   listResponseSchema,
+  listVehiclesQuerySchema,
   moveAllocationRequestSchema,
+  operatingClockSchema,
   orderSchema,
   resequenceTripRequestSchema,
   SYNC_BATCH_LIMIT,
+  seedResetRequestSchema,
+  seedResetResponseSchema,
   syncEventsRequestSchema,
   syncEventsResponseSchema,
+  syncTripDeltaSchema,
   updateOrderRequestSchema,
   versionQuerySchema,
 } from '../src/index.ts';
@@ -88,6 +97,14 @@ describe('common DTOs', () => {
   it('parses the sync ?since= version', () => {
     expect(versionQuerySchema.parse({ since: '12' })).toEqual({ since: 12 });
     expect(versionQuerySchema.safeParse({ since: 'latest' }).success).toBe(false);
+  });
+
+  it('accepts vehicle reference filters and rejects an unknown status', () => {
+    expect(
+      listVehiclesQuerySchema.parse({ type: 'van', temp: 'reefer', date: '2026-10-07' }),
+    ).toEqual({ type: 'van', temp: 'reefer', date: '2026-10-07' });
+    expect(listVehiclesQuerySchema.safeParse({ status: 'offline' }).success).toBe(false);
+    expect(listVehiclesQuerySchema.safeParse({ date: '07-10-2026' }).success).toBe(false);
   });
 });
 
@@ -168,5 +185,134 @@ describe('sync DTOs', () => {
       syncEventsResponseSchema.safeParse({ results: [{ clientEventId: ids.event, status: 'ok' }] })
         .success,
     ).toBe(false);
+  });
+
+  it('describes a trip delta, including an unchanged version', () => {
+    const unchanged = { changed: false, tripId: ids.trip, version: 3 };
+    expect(syncTripDeltaSchema.parse(unchanged)).toEqual(unchanged);
+    const changed = {
+      changed: true,
+      tripId: ids.trip,
+      since: 1,
+      version: 2,
+      added: [
+        {
+          id: ids.stop,
+          orderId: ids.order,
+          seq: 2,
+          plannedArrival: colomboTime,
+          status: 'pending',
+        },
+      ],
+      removed: [{ id: ids.other }],
+      reordered: [
+        {
+          id: ids.event,
+          orderId: ids.order,
+          seq: 1,
+          plannedArrival: colomboTime,
+          status: 'arrived',
+        },
+      ],
+      acknowledgementRequired: true,
+    };
+    expect(syncTripDeltaSchema.parse(changed)).toEqual(changed);
+    expect(syncTripDeltaSchema.safeParse({ ...unchanged, changed: true }).success).toBe(false);
+  });
+});
+
+describe('dashboard DTOs', () => {
+  const offline = {
+    presence: 'offline' as const,
+    tripId: ids.trip,
+    vehicleId: 'VEH014',
+    driverId: ids.user,
+    driverName: 'Van Driver',
+    lastSeenAt: '2026-10-08T09:12:00.000+05:30',
+    pendingSyncCount: 1,
+    label: 'Last seen 09:12 · may be offline',
+  };
+
+  it('keeps offline drivers free of live stop progress', () => {
+    const summary = {
+      date: '2026-10-08',
+      orders: {
+        confirmed: 2,
+        allocated: 1,
+        deferred: 1,
+        loading: 0,
+        dispatched: 1,
+        delivered: 1,
+        failed: 1,
+        receiptConfirmed: 0,
+      },
+      repeatDeferrals: 1,
+      loading: { notStarted: 1, inProgress: 1, exception: 0, ready: 0, departed: 1 },
+      activeTrips: 3,
+      stops: { pending: 1, arrived: 1, delivered: 1, failed: 1 },
+      pendingLoadingIssues: 1,
+      pendingSyncConflicts: 1,
+      fleet: { available: 3, unavailable: 1 },
+      utilization: { weight: 0.4, volume: 0.4, reefer: 0.5, van: 1 },
+      fuelUsedL: 20,
+      tightWindowStops: 1,
+      drivers: [offline],
+    };
+    const parsed = dashboardSummarySchema.parse(summary);
+    expect(parsed.drivers[0]).toEqual(offline);
+    expect(parsed.drivers[0]).not.toHaveProperty('lastStopStatus');
+  });
+
+  it('describes an exception and a lightweight stream message', () => {
+    const item = {
+      severity: 'high',
+      type: 'loading_shortfall',
+      entityType: 'loading_issue',
+      entityId: ids.order,
+      title: 'Loading shortfall',
+      reason: '2 cases short',
+      occurredAt: colomboTime,
+      action: { href: `/api/v1/trips/${ids.trip}/loading` },
+    };
+    expect(dashboardExceptionSchema.parse(item)).toEqual(item);
+    const message = {
+      type: 'trip.departed',
+      occurredAt: colomboTime,
+      entityType: 'trip',
+      entityId: ids.trip,
+    };
+    expect(dashboardStreamMessageSchema.parse(message)).toEqual(message);
+    expect(Object.keys(message)).toEqual(['type', 'occurredAt', 'entityType', 'entityId']);
+    expect(
+      auditTimelineSchema.parse({
+        items: [
+          {
+            id: ids.event,
+            actorId: ids.user,
+            role: 'dispatcher',
+            action: 'order.confirmed',
+            entityType: 'order',
+            entityId: ids.order,
+            before: null,
+            after: { status: 'confirmed' },
+            createdAt: colomboTime,
+          },
+        ],
+        total: 1,
+      }).total,
+    ).toBe(1);
+  });
+});
+
+describe('admin demo contracts', () => {
+  it('accepts an operating clock and an explicit seed reset', () => {
+    expect(operatingClockSchema.parse({ now: colomboTime })).toEqual({ now: colomboTime });
+    expect(operatingClockSchema.safeParse({ now: 'tomorrow' }).success).toBe(false);
+    expect(seedResetRequestSchema.parse({ confirm: true })).toEqual({ confirm: true });
+    expect(seedResetRequestSchema.safeParse({ confirm: false }).success).toBe(false);
+    expect(seedResetRequestSchema.safeParse({}).success).toBe(false);
+    expect(
+      seedResetResponseSchema.parse({ serviceDate: '2026-06-26', source: 'synthetic' }),
+    ).toEqual({ serviceDate: '2026-06-26', source: 'synthetic' });
   });
 });

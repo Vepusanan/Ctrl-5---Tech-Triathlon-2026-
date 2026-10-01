@@ -4,6 +4,7 @@ import {
   planInputSchema,
   planResultSchema,
   priorityWeightsSchema,
+  violationSchema,
 } from '../src/index.ts';
 import { colomboTime, ids, outletRow, vehicleRow } from './fixtures.ts';
 
@@ -127,5 +128,24 @@ describe('planning contract', () => {
     const [deferral] = planResult.deferred;
     const bad = { ...planResult, deferred: [{ ...deferral, reason: 'NO_ROOM' }] };
     expect(planResultSchema.safeParse(bad).success).toBe(false);
+  });
+});
+
+describe('violation contract', () => {
+  it('parses a violation that names the vehicle and the breached limit', () => {
+    const violation = {
+      rule: 'VOLUME_CAP',
+      tripKey: 'VEH031-1',
+      vehicleId: 'VEH031',
+      detail: '18.4 m3 exceeds capacity 16 m3',
+      actual: 18.4,
+      limit: 16,
+    };
+    expect(violationSchema.parse(violation)).toEqual(violation);
+  });
+
+  it('parses a violation with only the required fields', () => {
+    const violation = { rule: 'REEFER_REQUIRED', detail: 'Chilled order on ambient vehicle' };
+    expect(violationSchema.parse(violation)).toEqual(violation);
   });
 });

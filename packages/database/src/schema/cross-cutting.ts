@@ -23,6 +23,7 @@ export const notifications = pgTable(
     entityId: text('entity_id').notNull(),
     createdAt: eventTimestamp('created_at').notNull().defaultNow(),
     readAt: eventTimestamp('read_at'),
+    acknowledgedAt: eventTimestamp('acknowledged_at'),
   },
   (table) => [
     index('notifications_recipient_created_at').on(table.recipientId, table.createdAt),

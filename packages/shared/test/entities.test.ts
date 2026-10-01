@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   brandSchema,
+  calendarDaySchema,
   deferralSchema,
+  depotSchema,
   issueSchema,
   loadingIssueSchema,
   notificationPriorityByType,
+  notificationRequiresAction,
   notificationTypeSchema,
   orderSchema,
   outletSchema,
@@ -40,8 +43,23 @@ describe('enums', () => {
     expect(Object.keys(notificationPriorityByType).sort()).toEqual(
       [...notificationTypeSchema.options].sort(),
     );
+    expect(notificationPriorityByType.order_confirmed).toBe('info');
     expect(notificationPriorityByType.order_deferred).toBe('high');
+    expect(notificationPriorityByType.plan_published).toBe('high');
+    expect(notificationPriorityByType.plan_changed).toBe('high');
+    expect(notificationPriorityByType.loading_shortfall).toBe('high');
+    expect(notificationPriorityByType.delivery_failed).toBe('high');
+    expect(notificationPriorityByType.delivery_issue).toBe('high');
+    expect(notificationPriorityByType.delivered).toBe('info');
+    expect(notificationPriorityByType.receipt_discrepancy).toBe('high');
     expect(notificationPriorityByType.sync_conflict).toBe('medium');
+  });
+
+  it('keeps acknowledgement separate from priority for high-priority items', () => {
+    expect(notificationRequiresAction('high', null)).toBe(true);
+    expect(notificationRequiresAction('high', colomboTime)).toBe(false);
+    expect(notificationRequiresAction('medium', null)).toBe(false);
+    expect(notificationRequiresAction('info', null)).toBe(false);
   });
 });
 
@@ -66,6 +84,26 @@ describe('reference data', () => {
 
   it('parses a vehicle row', () => {
     expect(vehicleSchema.parse(vehicleRow)).toEqual(vehicleRow);
+  });
+
+  it('parses a depot and a calendar day', () => {
+    const depot = { id: 'Peliyagoda', name: 'Peliyagoda' };
+    const day = {
+      date: '2026-10-07',
+      dow: 2,
+      isoYear: 2026,
+      isoWeek: 41,
+      isPayday: true,
+      festival: null,
+      festivalRamp: 0,
+      isHoliday: false,
+      monsoon: true,
+      isOperating: true,
+    };
+    expect(depotSchema.parse(depot)).toEqual(depot);
+    expect(calendarDaySchema.parse(day)).toEqual(day);
+    expect(calendarDaySchema.safeParse({ ...day, festivalRamp: 1.2 }).success).toBe(false);
+    expect(calendarDaySchema.safeParse({ ...day, dow: 7 }).success).toBe(false);
   });
 
   it.each([
@@ -180,11 +218,14 @@ describe('loading, store and notification records', () => {
   it('requires a positive quantity on loading issues', () => {
     const issue = {
       id: ids.other,
+      tripId: ids.trip,
       orderId: ids.order,
       type: 'damaged',
       qty: 2,
       note: 'Crushed carton',
+      loaderId: ids.user,
       acknowledgedBy: null,
+      acknowledgedAt: null,
       createdAt: colomboTime,
     };
     expect(loadingIssueSchema.safeParse(issue).success).toBe(true);
@@ -198,6 +239,7 @@ describe('loading, store and notification records', () => {
       type: 'incorrect',
       note: null,
       status: 'open',
+      createdBy: ids.user,
       createdAt: colomboTime,
     };
     expect(issueSchema.parse(issue)).toEqual(issue);

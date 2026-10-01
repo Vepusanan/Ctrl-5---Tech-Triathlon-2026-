@@ -35,6 +35,17 @@ function isAllowedImport(specifier: string): boolean {
   );
 }
 
+// Comments and quoted text may say "delivery window". `outlet.window` is that field, not the browser global.
+function inspectableSource(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '')
+    .replace(/`(?:\\[\s\S]|[^`])*`/g, '""')
+    .replace(/'(?:\\.|[^'\n])*'/g, '""')
+    .replace(/"(?:\\.|[^"\n])*"/g, '""')
+    .replace(/\.window\b/g, '.deliveryHours');
+}
+
 describe('planning package purity', () => {
   const files = sourceFiles();
 
@@ -49,11 +60,19 @@ describe('planning package purity', () => {
   });
 
   it.each(files)('%s avoids clocks, randomness, environment, HTTP and browser APIs', (file) => {
-    const source = readFileSync(join(packageRoot, file), 'utf8');
+    const source = inspectableSource(readFileSync(join(packageRoot, file), 'utf8'));
     const violations = forbiddenPatterns
       .filter(({ pattern }) => pattern.test(source))
       .map(({ pattern, reason }) => `${pattern.source}: ${reason}`);
     expect(violations).toEqual([]);
+  });
+
+  it('still flags the browser window global and ignores the outlet field', () => {
+    const flagged = inspectableSource('const view = window.document;');
+    const allowed = inspectableSource('const close = outlet.window.close; // delivery window');
+    const windowPattern = forbiddenPatterns.find((item) => item.reason === 'no browser APIs');
+    expect(windowPattern?.pattern.test(flagged)).toBe(true);
+    expect(windowPattern?.pattern.test(allowed)).toBe(false);
   });
 
   it('declares no runtime dependencies other than @waypoint/shared', () => {

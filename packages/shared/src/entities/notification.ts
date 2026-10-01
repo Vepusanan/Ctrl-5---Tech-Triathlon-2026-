@@ -8,13 +8,16 @@ import {
 } from '../enums.ts';
 import { timestampSchema, uuidSchema } from '../primitives.ts';
 
-// SYSTEM_DESIGN §11.1.
+// SYSTEM_DESIGN §11.1. plan_changed and delivery_issue stay distinct from the first
+// publish and from a failed stop so each event keeps its own feed entry.
 export const notificationPriorityByType = {
   order_confirmed: 'info',
   order_deferred: 'high',
   plan_published: 'high',
+  plan_changed: 'high',
   loading_shortfall: 'high',
   delivery_failed: 'high',
+  delivery_issue: 'high',
   delivered: 'info',
   receipt_discrepancy: 'high',
   sync_conflict: 'medium',
@@ -29,5 +32,14 @@ export const notificationSchema = z.object({
   entityId: z.string().min(1),
   createdAt: timestampSchema,
   readAt: timestampSchema.nullable(),
+  acknowledgedAt: timestampSchema.nullable(),
 });
 export type Notification = z.infer<typeof notificationSchema>;
+
+// High-priority items need an acknowledgement. Reading one does not clear that.
+export function notificationRequiresAction(
+  priority: NotificationPriority,
+  acknowledgedAt: string | null,
+): boolean {
+  return priority === 'high' && acknowledgedAt === null;
+}

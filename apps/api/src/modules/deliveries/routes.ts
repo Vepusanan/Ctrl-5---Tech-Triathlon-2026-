@@ -1,0 +1,98 @@
+import multipart from '@fastify/multipart';
+import {
+  apiErrorSchema,
+  deliveryStopSchema,
+  idParamsSchema,
+  podSchema,
+  stopEventInputSchema,
+  stopEventSchema,
+} from '@waypoint/shared';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import { MAX_IMAGE_BYTES, MAX_POD_BODY_BYTES } from './images.ts';
+import { createDeliveryService } from './service.ts';
+import { readPodUpload } from './upload.ts';
+
+const readRoles = ['dispatcher', 'driver'] as const;
+
+export const deliveryRoutes: FastifyPluginAsyncZod = async (app) => {
+  await app.register(multipart, {
+    throwFileSizeLimit: true,
+    limits: {
+      fileSize: MAX_IMAGE_BYTES,
+      files: 2,
+      fields: 4,
+      fieldSize: 512,
+    },
+  });
+  const service = createDeliveryService(app.db, app.audit, app.domainEvents, app.clock);
+
+  app.get(
+    '/stops/:id',
+    {
+      preHandler: app.requireRole(...readRoles),
+      schema: {
+        tags: ['deliveries'],
+        params: idParamsSchema,
+        response: {
+          200: deliveryStopSchema,
+          400: apiErrorSchema,
+          401: apiErrorSchema,
+          403: apiErrorSchema,
+          404: apiErrorSchema,
+        },
+      },
+    },
+    async (request) => service.get(request.user, request.params.id),
+  );
+
+  app.post(
+    '/stops/:id/events',
+    {
+      preHandler: app.requireRole('driver'),
+      schema: {
+        tags: ['deliveries'],
+        params: idParamsSchema,
+        body: stopEventInputSchema,
+        response: {
+          200: stopEventSchema,
+          201: stopEventSchema,
+          400: apiErrorSchema,
+          401: apiErrorSchema,
+          403: apiErrorSchema,
+          404: apiErrorSchema,
+          422: apiErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await service.recordEvent(request.user, request.params.id, request.body);
+      return reply.code(result.outcome === 'applied' ? 201 : 200).send(result.event);
+    },
+  );
+
+  app.post(
+    '/stops/:id/pod',
+    {
+      // Two images, each under the 2 MB file limit, plus multipart framing.
+      bodyLimit: MAX_POD_BODY_BYTES,
+      preHandler: app.requireRole('driver'),
+      schema: {
+        tags: ['deliveries'],
+        params: idParamsSchema,
+        response: {
+          201: podSchema,
+          400: apiErrorSchema,
+          401: apiErrorSchema,
+          403: apiErrorSchema,
+          404: apiErrorSchema,
+          422: apiErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const upload = await readPodUpload(request.parts());
+      const pod = await service.recordPod(request.user, request.params.id, upload);
+      return reply.code(201).send(pod);
+    },
+  );
+};

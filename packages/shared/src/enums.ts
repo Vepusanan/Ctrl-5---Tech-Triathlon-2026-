@@ -122,6 +122,8 @@ export const notificationTypeSchema = z.enum([
   'delivered',
   'receipt_discrepancy',
   'sync_conflict',
+  'plan_changed',
+  'delivery_issue',
 ]);
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 

@@ -16,6 +16,7 @@ export const issueSchema = z.object({
   type: issueTypeSchema,
   note: z.string().trim().min(1).nullable(),
   status: issueStatusSchema,
+  createdBy: uuidSchema,
   createdAt: timestampSchema,
 });
 export type Issue = z.infer<typeof issueSchema>;

@@ -1,0 +1,184 @@
+import { orders } from '@waypoint/database';
+import type { User } from '@waypoint/shared';
+import { and, eq } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { buildApp } from '../src/app.ts';
+import { ApiError } from '../src/plugins/errors.ts';
+import { scope } from '../src/plugins/rbac.ts';
+import type { AuthFixture } from './fixture.ts';
+import { seedAuthFixture } from './fixture.ts';
+import { client, cookiePair, SESSION_SECRET } from './http.ts';
+import { createMigratedDatabase } from './postgres.ts';
+
+const orderParams = z.object({ id: z.uuid() });
+const orderBody = z.object({ id: z.uuid(), outletId: z.string() });
+
+describe('RBAC', () => {
+  let app: Awaited<ReturnType<typeof buildApp>>;
+  let close: (() => Promise<void>) | undefined;
+  let fixture: AuthFixture;
+
+  beforeAll(async () => {
+    const database = await createMigratedDatabase();
+    close = database.close;
+    fixture = await seedAuthFixture(database.db);
+    app = await buildApp({
+      db: database.db,
+      logger: false,
+      sessionSecret: SESSION_SECRET,
+      secureCookies: false,
+    });
+
+    // Orders owns GET /orders/:id. This probe stays separate so loader and driver
+    // scope checks are not hidden behind that module's role gate.
+    app.get(
+      '/api/v1/probes/orders/:id',
+      {
+        preHandler: app.requireRole('dispatcher', 'loader', 'driver', 'store_manager'),
+        schema: { params: orderParams, response: { 200: orderBody } },
+      },
+      async (request) => {
+        const user = request.user;
+        if (user === null) throw new ApiError('UNAUTHENTICATED', 'Sign in required');
+        const row = await readOrder(app, user, request.params.id);
+        if (row === null) throw new ApiError('NOT_FOUND', 'Order not found');
+        return row;
+      },
+    );
+
+    app.get(
+      '/api/v1/probes/dispatcher',
+      { preHandler: app.requireRole('dispatcher') },
+      async () => ({ ok: true }),
+    );
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await close?.();
+  });
+
+  it('returns 401 without a session and 403 for the wrong role', async () => {
+    const anonymous = await app.inject({ method: 'GET', url: '/api/v1/probes/dispatcher' });
+    expect(anonymous.statusCode).toBe(401);
+    expect(anonymous.json()).toEqual({
+      error: { code: 'UNAUTHENTICATED', message: 'Sign in required' },
+    });
+
+    const driver = await login(app, fixture.emails.driver, fixture.password);
+    const forbidden = await app.inject({
+      method: 'GET',
+      url: '/api/v1/probes/dispatcher',
+      headers: { cookie: driver },
+    });
+    expect(forbidden.statusCode).toBe(403);
+    expect(forbidden.json()).toEqual({
+      error: { code: 'FORBIDDEN', message: 'You do not have access to this action' },
+    });
+
+    const dispatcher = await login(app, fixture.emails.dispatcher, fixture.password);
+    const allowed = await app.inject({
+      method: 'GET',
+      url: '/api/v1/probes/dispatcher',
+      headers: { cookie: dispatcher },
+    });
+    expect(allowed.statusCode).toBe(200);
+  });
+
+  it('hides orders outside the caller scope with 404', async () => {
+    const store = await login(app, fixture.emails.storeManager, fixture.password);
+    const loader = await login(app, fixture.emails.loader, fixture.password);
+    const dispatcher = await login(app, fixture.emails.dispatcher, fixture.password);
+    const central = await login(app, fixture.emails.central, fixture.password);
+    const driver = await login(app, fixture.emails.driver, fixture.password);
+
+    expect(await orderStatus(app, store, fixture.orders.home)).toBe(200);
+    expect(await orderStatus(app, store, fixture.orders.sibling)).toBe(404);
+    expect(await orderStatus(app, store, fixture.orders.otherDepot)).toBe(404);
+
+    expect(await orderStatus(app, loader, fixture.orders.home)).toBe(200);
+    expect(await orderStatus(app, loader, fixture.orders.sibling)).toBe(200);
+    expect(await orderStatus(app, loader, fixture.orders.otherDepot)).toBe(404);
+
+    expect(await orderStatus(app, dispatcher, fixture.orders.sibling)).toBe(200);
+    expect(await orderStatus(app, dispatcher, fixture.orders.otherDepot)).toBe(404);
+    expect(await orderStatus(app, central, fixture.orders.otherDepot)).toBe(200);
+
+    expect(await orderStatus(app, driver, fixture.orders.home)).toBe(404);
+
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/v1/orders/00000000-0000-7000-8000-000000000099',
+      headers: { cookie: central },
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ error: { code: 'NOT_FOUND', message: 'Order not found' } });
+  });
+
+  it('hides trips outside the caller scope with 404', async () => {
+    const driver = await login(app, fixture.emails.driver, fixture.password);
+    const loader = await login(app, fixture.emails.loader, fixture.password);
+    const dispatcher = await login(app, fixture.emails.dispatcher, fixture.password);
+    const store = await login(app, fixture.emails.storeManager, fixture.password);
+
+    expect(await tripStatus(app, driver, fixture.trips.home)).toBe(200);
+    expect(await tripStatus(app, driver, fixture.trips.otherDepot)).toBe(404);
+    expect(await tripStatus(app, loader, fixture.trips.home)).toBe(200);
+    expect(await tripStatus(app, loader, fixture.trips.otherDepot)).toBe(404);
+    expect(await tripStatus(app, dispatcher, fixture.trips.otherDepot)).toBe(404);
+    // Internal trip detail is not a store tracking API.
+    expect(await tripStatus(app, store, fixture.trips.home)).toBe(403);
+    expect(await tripStatus(app, store, fixture.trips.otherDepot)).toBe(403);
+  });
+});
+
+async function login(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  email: string,
+  password: string,
+): Promise<string> {
+  const response = await app.inject({
+    ...client(),
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    payload: { email, password },
+  });
+  expect(response.statusCode).toBe(200);
+  return cookiePair(response);
+}
+
+async function orderStatus(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  cookie: string,
+  id: string,
+): Promise<number> {
+  const response = await app.inject({
+    method: 'GET',
+    url: `/api/v1/probes/orders/${id}`,
+    headers: { cookie },
+  });
+  return response.statusCode;
+}
+
+async function tripStatus(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  cookie: string,
+  id: string,
+): Promise<number> {
+  const response = await app.inject({
+    method: 'GET',
+    url: `/api/v1/trips/${id}`,
+    headers: { cookie },
+  });
+  return response.statusCode;
+}
+
+async function readOrder(app: Awaited<ReturnType<typeof buildApp>>, user: User, id: string) {
+  const rows = await app.db
+    .select({ id: orders.id, outletId: orders.outletId })
+    .from(orders)
+    .where(and(eq(orders.id, id), scope(user).orders))
+    .limit(1);
+  return rows[0] ?? null;
+}

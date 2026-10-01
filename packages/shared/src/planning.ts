@@ -16,11 +16,15 @@ import {
 
 // Planning engine contract (SYSTEM_DESIGN §7.1). The engine is pure: callers build PlanInput.
 
+// SYSTEM_DESIGN §6.3 / §7.2. Optional fields are omitted when a rule does not use them.
 export const violationSchema = z.object({
   rule: reasonCodeSchema,
   orderId: uuidSchema.optional(),
   tripKey: tripKeySchema.optional(),
+  vehicleId: vehicleIdSchema.optional(),
   detail: z.string().min(1),
+  actual: z.number().optional(),
+  limit: z.number().optional(),
 });
 export type Violation = z.infer<typeof violationSchema>;
 

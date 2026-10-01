@@ -17,7 +17,15 @@ export default defineConfig({
       },
       {
         extends: true,
-        test: { name: 'api', root: './apps/api', include: ['test/**/*.test.ts'] },
+        test: {
+          name: 'api',
+          root: './apps/api',
+          include: ['test/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
+          hookTimeout: 60_000,
+          testTimeout: 30_000,
+          // Auth and RBAC tests share one Postgres database.
+          fileParallelism: false,
+        },
       },
       {
         extends: true,
