@@ -17,6 +17,7 @@ import { orderRoutes } from './modules/orders/routes.ts';
 import { planningRoutes } from './modules/planning/routes.ts';
 import { receiptRoutes } from './modules/receipts/routes.ts';
 import { referenceRoutes } from './modules/reference/routes.ts';
+import { storeRoutes } from './modules/store/routes.ts';
 import { syncRoutes } from './modules/sync/routes.ts';
 import { tripRoutes } from './modules/trips/routes.ts';
 import { auditPlugin } from './plugins/audit.ts';
@@ -91,6 +92,7 @@ export async function buildApp({
   await app.register(loadingRoutes, { prefix: '/api/v1' });
   await app.register(deliveryRoutes, { prefix: '/api/v1' });
   await app.register(receiptRoutes, { prefix: '/api/v1' });
+  await app.register(storeRoutes, { prefix: '/api/v1' });
   await app.register(syncRoutes, { prefix: '/api/v1' });
   await app.register(notificationRoutes, { prefix: '/api/v1' });
   await app.register(dashboardRoutes, { prefix: '/api/v1' });

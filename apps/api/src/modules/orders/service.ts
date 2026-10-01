@@ -323,7 +323,11 @@ async function assertOperatingDay(repo: OrderRepo, db: OrderDb, date: string): P
   }
 }
 
-async function nextEligibleServiceDate(repo: OrderRepo, db: OrderDb, now: Date): Promise<string> {
+export async function nextEligibleServiceDate(
+  repo: OrderRepo,
+  db: OrderDb,
+  now: Date,
+): Promise<string> {
   const today = colomboDate(now);
   const todayRow = await repo.findCalendarDay(db, today);
   if (todayRow === null) {
