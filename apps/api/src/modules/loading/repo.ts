@@ -1,11 +1,21 @@
 import type { Database } from '@waypoint/database';
 import {
+  and,
+  asc,
+  auditLog,
+  desc,
+  eq,
+  inArray,
+  isNull,
   loadingIssues,
   loadingRecords,
   notifications,
+  or,
   orders,
   outlets,
   planningRuns,
+  type SQL,
+  sql,
   tripStops,
   trips,
   users,
@@ -25,9 +35,10 @@ import type {
   VehicleTemperature,
   VehicleType,
 } from '@waypoint/shared';
-import { and, asc, eq, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
+import { type LoadingState, loadingPlanSnapshotSchema } from '@waypoint/shared';
 
-export type LoadingDb = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
+// Both the database and a transaction expose these repository operations.
+export type LoadingDb = Pick<Database, 'select' | 'insert' | 'update'>;
 
 export interface LockedTrip {
   id: string;
@@ -84,6 +95,7 @@ interface LoadingVehicleRow {
 }
 
 export interface LoadingBundle {
+  acceptedPlan?: LoadingState['acceptedPlan'];
   trip: LockedTrip;
   vehicle: LoadingVehicleRow;
   record: LoadingRecordRow | null;
@@ -206,7 +218,22 @@ export function createLoadingRepo(): LoadingRepo {
         .from(loadingRecords)
         .where(eq(loadingRecords.tripId, id))
         .limit(1);
+      const [accepted] = await db
+        .select({ after: auditLog.after })
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.entityId, id),
+            eq(auditLog.entityType, 'trip'),
+            inArray(auditLog.action, ['loading.started', 'loading.verified']),
+            sql`${auditLog.after}->'acceptedPlan'->>'tripVersion' = ${String(record?.acceptedTripVersion ?? '')}`,
+          ),
+        )
+        .orderBy(desc(auditLog.createdAt))
+        .limit(1);
+      const snapshot = loadingPlanSnapshotSchema.safeParse(accepted?.after?.acceptedPlan);
       return {
+        acceptedPlan: snapshot.success ? snapshot.data : null,
         trip: {
           id: trip.id,
           status: trip.status,

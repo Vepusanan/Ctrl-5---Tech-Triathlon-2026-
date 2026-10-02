@@ -1,3 +1,4 @@
+export { and, asc, desc, eq, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 export { createDatabase, type Database, type DatabaseConnection } from './client.ts';
 export { databaseUrlSchema } from './env.ts';
 export * from './schema/index.ts';

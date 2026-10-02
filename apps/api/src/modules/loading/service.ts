@@ -116,6 +116,7 @@ export function createLoadingService(
             loadingStatus: 'in_progress',
             tripVersion: version,
             loaderId: loader.id,
+            acceptedPlan: planSnapshot(current),
           },
           createdAt: now,
         });
@@ -152,6 +153,7 @@ export function createLoadingService(
               loading.verifiedAt === null ? null : formatColomboTimestamp(loading.verifiedAt),
           },
           after: {
+            acceptedPlan: planSnapshot(current),
             acceptedTripVersion: trip.version,
             planVersion: trip.planVersion,
             verifiedAt: formatColomboTimestamp(now),
@@ -165,7 +167,7 @@ export function createLoadingService(
           createdAt: now,
         });
         pending.push(loadingEvent('loading.verified', loader.id, now, trip));
-        return toState(current);
+        return { ...toState(current), acceptedPlan: planSnapshot(current) };
       });
       publish(events, pending);
       return state;
@@ -401,6 +403,7 @@ function toIssue(issue: LoadingIssueRow): LoadingIssue {
 function toState(bundle: LoadingBundle): LoadingState {
   const record = bundle.record;
   return {
+    acceptedPlan: bundle.acceptedPlan ?? null,
     tripId: bundle.trip.id,
     status: record?.status ?? 'not_started',
     loaderId: record?.loaderId ?? null,
@@ -456,4 +459,9 @@ function loadingEvent(
 
 function publish(events: DomainEventBus, pending: readonly LoadingDomainEvent[]): void {
   for (const event of pending) events.publish(event);
+}
+
+function planSnapshot(bundle: LoadingBundle) {
+  const state = toState(bundle);
+  return { planVersion: state.planVersion, tripVersion: state.tripVersion, stops: state.stops };
 }

@@ -15,8 +15,15 @@ export const loadingStopSchema = z.object({
 });
 export type LoadingStop = z.infer<typeof loadingStopSchema>;
 
+export const loadingPlanSnapshotSchema = z.object({
+  planVersion: versionSchema,
+  tripVersion: versionSchema,
+  stops: z.array(loadingStopSchema),
+});
+
 export const loadingStateSchema = z.object({
   tripId: uuidSchema,
+  acceptedPlan: loadingPlanSnapshotSchema.nullable().optional(),
   status: loadingStatusSchema,
   loaderId: uuidSchema.nullable(),
   tripVersion: versionSchema,

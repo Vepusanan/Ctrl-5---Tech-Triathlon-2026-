@@ -92,6 +92,10 @@ describe('loading', () => {
     expect(state.planVersion).toBe(2);
     expect(state.acceptedTripVersion).toBe(0);
     expect(state.planStale).toBe(false);
+    expect(state.acceptedPlan).toMatchObject({
+      tripVersion: state.tripVersion,
+      planVersion: state.planVersion,
+    });
     expect(state.vehicle).toMatchObject({ id: 'VEH301', type: 'van' });
     expect(state.stops.map((stop) => stop.seq)).toEqual([1, 2]);
     expect(state.stops[0]).toMatchObject({
@@ -318,6 +322,8 @@ describe('loading', () => {
     const staleView = loadingStateSchema.parse(json(view, 200));
     expect(staleView.tripVersion).toBe(1);
     expect(staleView.planStale).toBe(true);
+    expect(staleView.acceptedPlan?.tripVersion).toBe(staleView.acceptedTripVersion);
+    expect(staleView.acceptedPlan?.stops).toHaveLength(staleView.stops.length);
 
     const stale = await app.inject({
       method: 'POST',
@@ -344,6 +350,7 @@ describe('loading', () => {
     });
     const accepted = loadingStateSchema.parse(json(verified, 200));
     expect(accepted.planStale).toBe(false);
+    expect(accepted.acceptedPlan?.tripVersion).toBe(accepted.tripVersion);
     expect(accepted.acceptedTripVersion).toBe(1);
 
     const ready = await app.inject({
