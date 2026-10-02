@@ -32,8 +32,10 @@ test('tablet loading journey, stale plan gate and Dispatcher acknowledgement', a
       .evaluateAll((nodes) =>
         nodes
           .filter((node) => {
+            // A visually hidden checkbox or radio is operated through its label.
             const target =
-              node instanceof HTMLInputElement && node.type === 'checkbox'
+              node instanceof HTMLInputElement &&
+              (node.type === 'checkbox' || node.type === 'radio')
                 ? (node.closest('label') ?? node)
                 : node;
             const rect = target.getBoundingClientRect();
@@ -76,6 +78,35 @@ test('tablet loading journey, stale plan gate and Dispatcher acknowledgement', a
     stops: [stop(1), stop(2)],
     issues: [],
   };
+  const trip = () => ({
+    id: uid(1),
+    runId: uid(3),
+    vehicleId: 'VEH001',
+    tripNo: 1,
+    brand: 'Fresh',
+    district: 'Kandy',
+    status: state.status === 'ready' ? 'ready' : 'published',
+    version: state.tripVersion,
+    plannedMinutes: 80,
+    plannedKm: 30,
+    run: {
+      id: uid(3),
+      depotId: 'Kandy',
+      serviceDate: '2026-10-08',
+      status: 'published',
+      planVersion: state.planVersion,
+    },
+    vehicle: state.vehicle,
+    stops: state.stops.map((s) => ({
+      ...s,
+      tripId: uid(1),
+      orderId: s.order.id,
+      status: 'pending',
+    })),
+    loadingStatus: state.status,
+    exceptions: state.issues,
+    lastEvent: null,
+  });
   const calls: string[] = [];
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url());
@@ -90,41 +121,11 @@ test('tablet loading journey, stale plan gate and Dispatcher acknowledgement', a
           email: 'loader@example.com',
         },
       };
-    else if (url.pathname.endsWith('/trips'))
-      body = {
-        total: 1,
-        items: [
-          {
-            id: uid(1),
-            runId: uid(3),
-            vehicleId: 'VEH001',
-            tripNo: 1,
-            brand: 'Fresh',
-            district: 'Kandy',
-            status: 'published',
-            version: 1,
-            plannedMinutes: 80,
-            plannedKm: 30,
-            run: {
-              id: uid(3),
-              depotId: 'Kandy',
-              serviceDate: '2026-10-08',
-              status: 'published',
-              planVersion: 1,
-            },
-            vehicle: state.vehicle,
-            stops: state.stops.map((s) => ({
-              ...s,
-              tripId: uid(1),
-              orderId: s.order.id,
-              status: 'pending',
-            })),
-            loadingStatus: state.status,
-            exceptions: state.issues,
-            lastEvent: null,
-          },
-        ],
-      };
+    else if (url.pathname.endsWith('/trips')) body = { total: 1, items: [trip()] };
+    else if (url.pathname.endsWith(`/trips/${uid(1)}`)) body = trip();
+    // The app bar reads notices and the plan reads outlet districts; both are empty here.
+    else if (url.pathname.endsWith('/notifications') || url.pathname.endsWith('/outlets'))
+      body = { total: 0, items: [] };
     else if (url.pathname.includes('/loading')) {
       if (route.request().method() === 'POST') {
         const action = url.pathname.split('/').pop() ?? '';
@@ -175,34 +176,45 @@ test('tablet loading journey, stale plan gate and Dispatcher acknowledgement', a
     }
     await route.fulfill({ json: body });
   });
+  const countEveryStop = async () => {
+    await page.getByRole('button', { name: 'Mark all 4 units loaded' }).click();
+    await page.getByRole('button', { name: /^Next stop/ }).click();
+    await page.getByRole('button', { name: 'Mark all 4 units loaded' }).click();
+  };
+
+  // L01 → L02: the last stop is loaded first.
   await page.goto('/loader');
   await expect(page.getByRole('heading', { name: 'Assigned loads' })).toBeVisible();
   await capture('L01');
-  await page.getByRole('link', { name: 'View plan & start loading' }).click();
+  await page.getByRole('link', { name: 'View plan' }).click();
   await expect(page.locator('.loader-stop').first()).toContainText('OUT002');
   await page.getByRole('button', { name: 'Start loading', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Verify loading', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Report shortfall' })).toBeVisible();
   await capture('L02');
-  await page.getByRole('button', { name: 'Verify loading', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Confirm verification' })).toBeDisabled();
-  for (const outlet of ['OUT002', 'OUT001']) {
-    await page.locator('.loader-stop').filter({ hasText: outlet }).click();
-    await page.getByRole('spinbutton', { name: 'Loaded quantity' }).fill('4');
-  }
-  for (const box of await page.getByRole('checkbox').all()) await box.check();
+
+  // L03: verification is recorded against the plan before the Ready rules.
+  await countEveryStop();
+  await page.getByRole('button', { name: 'Verify load' }).click();
+  await expect(page.getByRole('button', { name: 'Confirm verification' })).toBeEnabled();
   await page.setViewportSize({ width: 768, height: 1024 });
   await capture('L03-portrait');
   await page.setViewportSize({ width: 1180, height: 820 });
   await capture('L03');
   await page.getByRole('button', { name: 'Confirm verification' }).click();
-  await expect(page.getByRole('button', { name: 'Mark load Ready' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Report exception', exact: true }).click();
-  await page.getByLabel('Notes').fill('Two cartons damaged on dock.');
-  await page.getByRole('button', { name: 'Damaged', exact: true }).click();
-  await page.getByLabel('Affected quantity').fill('2');
+  await expect(page.getByRole('button', { name: 'Mark Ready' })).toBeEnabled();
+
+  // L04 → L04a: a shortfall goes to the Dispatcher and Ready waits.
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('link', { name: 'Report shortfall' }).click();
+  await page.getByLabel('Note (optional)').fill('Two cartons damaged on dock.');
+  await page.getByText('Damaged', { exact: true }).click();
+  await page.getByRole('button', { name: 'One more' }).click();
   await capture('L04');
-  await page.getByRole('button', { name: 'Send to Dispatcher' }).click();
-  await expect(page.getByText('Awaiting Dispatcher', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Send to dispatcher' }).click();
+  await expect(page.getByRole('heading', { name: 'Dispatcher is deciding' })).toBeVisible();
+  await capture('L04a');
+
+  // L05: the plan changes; the diff shows and Ready stays blocked until acknowledged.
   state = {
     ...state,
     tripVersion: 2,
@@ -213,21 +225,14 @@ test('tablet loading journey, stale plan gate and Dispatcher acknowledgement', a
       { ...stop(2), seq: 1 },
     ],
   };
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-  await expect(page.getByText('OUT001: stop 1 → 2', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mark load Ready' })).toHaveCount(0);
-  await capture('L05');
   await page.reload();
   await expect(page.getByText('OUT001: stop 1 → 2', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Review complete · reverify load' }).click();
-  await expect(page.getByRole('button', { name: 'Acknowledge & verify plan' })).toBeDisabled();
-  for (const outlet of ['OUT001', 'OUT002']) {
-    await page.locator('.loader-stop').filter({ hasText: outlet }).click();
-    await page.getByRole('spinbutton', { name: 'Loaded quantity' }).fill('4');
-  }
-  for (const box of await page.getByRole('checkbox').all()) await box.check();
-  await page.getByRole('button', { name: 'Acknowledge & verify plan' }).click();
-  await expect(page.getByRole('button', { name: 'Mark load Ready' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Mark Ready' })).toHaveCount(0);
+  await capture('L05');
+  await page.getByRole('button', { name: 'Acknowledge v2' }).click();
+  await expect(page.getByRole('heading', { name: 'Dispatcher is deciding' })).toBeVisible();
+
+  // The Dispatcher acknowledges; the loader recounts, verifies and marks Ready (L06).
   state = {
     ...state,
     status: 'in_progress',
@@ -237,11 +242,15 @@ test('tablet loading journey, stale plan gate and Dispatcher acknowledgement', a
       acknowledgedAt: '2026-10-08T05:10:00+05:30',
     })),
   };
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-  await expect(page.getByText('Dispatcher acknowledged', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Mark load Ready' }).click();
-  await expect(page.getByText('Load marked Ready.', { exact: true })).toBeVisible();
-  expect(calls).toEqual(['start', 'verify', 'issues', 'verify', 'ready']);
+  await page.reload();
+  await countEveryStop();
+  await page.getByRole('button', { name: 'Verify load' }).click();
+  await page.getByRole('button', { name: 'Confirm verification' }).click();
+  await expect(page.getByText('1 of 1 acknowledged', { exact: true })).toBeVisible();
+  await capture('L06');
+  await page.getByRole('button', { name: 'Mark Ready' }).click();
+  await expect(page.getByRole('button', { name: 'Confirm departure' })).toBeVisible();
+  expect(calls).toEqual(['start', 'verify', 'issues', 'verify', 'verify', 'ready']);
   const broken = await page
     .locator('img')
     .evaluateAll((images: HTMLImageElement[]) =>

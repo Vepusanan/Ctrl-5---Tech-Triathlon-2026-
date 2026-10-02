@@ -13,6 +13,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { Link, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AppShell, Button, ErrorState, LoadingState, TopBar } from '../../components/waypoint';
 import { api, HttpError, message, noContent } from '../../lib/api';
+import { replaceSession } from '../../lib/session';
 import { StoreSignIn } from './auth';
 import { StoreDashboard, StoreIssues, StoreOrders } from './dashboard';
 import { StoreOrderPage } from './order-page';
@@ -112,8 +113,7 @@ function SignOut() {
           setError('');
           try {
             await api('/auth/logout', noContent, { method: 'POST' });
-            client.clear();
-            client.setQueryData(['session'], null);
+            replaceSession(client, null);
           } catch (cause) {
             setError(message(cause));
           } finally {

@@ -7,6 +7,7 @@ FROM base AS manifests
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/
 COPY packages/shared/package.json packages/shared/
+COPY packages/planning/package.json packages/planning/
 COPY packages/database/package.json packages/database/
 
 FROM manifests AS prod-deps
@@ -16,6 +17,7 @@ FROM manifests AS build
 RUN pnpm install --frozen-lockfile --ignore-scripts --filter "@waypoint/api..."
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
+COPY packages/planning packages/planning
 COPY packages/database packages/database
 COPY apps/api apps/api
 RUN pnpm --filter "@waypoint/api..." build
@@ -24,6 +26,7 @@ FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=prod-deps /app ./
 COPY --from=build /app/packages/shared/dist packages/shared/dist
+COPY --from=build /app/packages/planning/dist packages/planning/dist
 COPY --from=build /app/packages/database/dist packages/database/dist
 COPY packages/database/migrations packages/database/migrations
 COPY --from=build /app/apps/api/dist apps/api/dist

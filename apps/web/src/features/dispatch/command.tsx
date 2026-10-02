@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type DashboardException,
   dashboardExceptionsSchema,
   dashboardSummarySchema,
+  loadingIssueSchema,
 } from '@waypoint/shared';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -41,6 +42,16 @@ export function CommandCenter() {
     queryKey: ['dashboard', date, 'exceptions'],
     queryFn: () => api(`/dashboard/exceptions?date=${date}`, dashboardExceptionsSchema),
     refetchInterval: 15_000,
+  });
+  const client = useQueryClient();
+  // A loader cannot mark the load ready until every shortfall is acknowledged here.
+  const acknowledge = useMutation({
+    mutationFn: (issueId: string) =>
+      api(`/loading/issues/${issueId}/ack`, loadingIssueSchema, { method: 'POST' }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['dashboard', date] });
+      await client.invalidateQueries({ queryKey: ['trips', date] });
+    },
   });
   if (summary.isPending || exceptions.isPending) {
     return <LoadingState label="Loading the command center…" />;
@@ -109,18 +120,26 @@ export function CommandCenter() {
       </div>
       <ActionList
         title="Needs action"
-        items={exceptions.data.items.map((item) => ({
-          id: `${item.type}:${item.entityId}`,
-          title: item.title,
-          description: item.reason,
-          tone:
-            item.severity === 'high'
-              ? 'danger'
-              : item.severity === 'medium'
-                ? 'warning'
-                : 'neutral',
-          onClick: () => navigate(`${links[item.type]}?date=${date}`),
-        }))}
+        items={exceptions.data.items.map((item) => {
+          const shortfall = item.type === 'loading_shortfall';
+          return {
+            id: `${item.type}:${item.entityId}`,
+            title: item.title,
+            // A loader cannot mark the load ready until the shortfall is acknowledged here.
+            description: shortfall ? `${item.reason} · select to acknowledge` : item.reason,
+            tone:
+              item.severity === 'high'
+                ? 'danger'
+                : item.severity === 'medium'
+                  ? 'warning'
+                  : 'neutral',
+            disabled: shortfall && acknowledge.isPending,
+            onClick: shortfall
+              ? () => acknowledge.mutate(item.entityId)
+              : () => navigate(`${links[item.type]}?date=${date}`),
+          };
+        })}
+        footer={acknowledge.error ? <p role="alert">{message(acknowledge.error)}</p> : undefined}
       />
       <p className="wp-muted">
         <Tag kind="blocks-publish" /> hard violations stay separate from <Tag kind="recommended" />{' '}

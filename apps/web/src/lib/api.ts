@@ -1,10 +1,14 @@
+import { apiErrorSchema, type Violation } from '@waypoint/shared';
+
 export class HttpError extends Error {
   status: number;
   code: string;
-  constructor(status: number, code: string, message: string) {
+  violations: Violation[];
+  constructor(status: number, code: string, message: string, violations: Violation[] = []) {
     super(message);
     this.status = status;
     this.code = code;
+    this.violations = violations;
   }
 }
 export async function api<T>(
@@ -19,7 +23,10 @@ export async function api<T>(
       credentials: 'same-origin',
       signal: options.signal ?? AbortSignal.timeout(20_000),
       headers: {
-        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        // A FormData body needs the browser's multipart boundary, so it sets its own type.
+        ...(options.body && !(options.body instanceof FormData)
+          ? { 'Content-Type': 'application/json' }
+          : {}),
         ...options.headers,
       },
     });
@@ -34,15 +41,21 @@ export async function api<T>(
   }
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
-    const error = body as { code?: string; message?: string } | null;
     if (response.status === 401 && path !== '/auth/me' && path !== '/auth/login') {
       window.dispatchEvent(new Event('waypoint:unauthenticated'));
     }
-    throw new HttpError(
-      response.status,
-      error?.code ?? 'REQUEST_FAILED',
-      error?.message ?? 'The request failed. Please try again.',
-    );
+    // SYSTEM_DESIGN §6.3: every API failure is { error: { code, message, violations? } }.
+    // Anything else (a proxy error page, an empty body) keeps the HTTP status only.
+    const envelope = apiErrorSchema.safeParse(body);
+    if (!envelope.success) {
+      throw new HttpError(
+        response.status,
+        'REQUEST_FAILED',
+        'The request failed. Please try again.',
+      );
+    }
+    const { error } = envelope.data;
+    throw new HttpError(response.status, error.code, error.message, error.violations ?? []);
   }
   try {
     return schema.parse(body);

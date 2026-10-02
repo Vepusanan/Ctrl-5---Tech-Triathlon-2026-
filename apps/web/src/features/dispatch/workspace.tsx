@@ -1,5 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { calendarListResponseSchema, currentUserResponseSchema, type User } from '@waypoint/shared';
+import {
+  calendarListResponseSchema,
+  currentUserResponseSchema,
+  operatingClockSchema,
+  type User,
+} from '@waypoint/shared';
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import {
@@ -11,11 +16,13 @@ import {
   TopBar,
 } from '../../components/waypoint';
 import { api, HttpError, message, noContent } from '../../lib/api';
+import { replaceSession } from '../../lib/session';
 import { StoreIcon, useOnline } from '../store/shared';
 import { AllocationWorkspace } from './allocate';
 import { CommandCenter } from './command';
 import { ConstraintPanel } from './conflicts';
 import { DeferralCenter } from './deferrals';
+import { DemoClock } from './demo-clock';
 import { VehicleInspector } from './inspector';
 import { LiveOperations } from './live';
 import { PlanningQueuePage } from './queue';
@@ -149,8 +156,7 @@ function SignOut() {
       variant="tertiary"
       onClick={async () => {
         await api('/auth/logout', noContent, { method: 'POST' }).catch(() => undefined);
-        client.clear();
-        client.setQueryData(['session'], null);
+        replaceSession(client, null);
       }}
     >
       Sign out
@@ -163,6 +169,11 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
     queryKey: ['calendar'],
     queryFn: () => api('/calendar', calendarListResponseSchema),
   });
+  const clock = useQuery({
+    queryKey: ['operating-clock'],
+    queryFn: operatingToday,
+    retry: false,
+  });
   const dates = useMemo(
     () =>
       (calendar.data?.items ?? [])
@@ -173,7 +184,10 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
   );
   const [params, setParams] = useSearchParams();
   const requested = params.get('date');
-  const date = requested && dates.includes(requested) ? requested : (dates.at(-1) ?? '');
+  // Default to the next run after the operating clock's day, as the store does.
+  const today = clock.data?.today;
+  const nextRun = today ? dates.find((day) => day > today) : undefined;
+  const date = requested && dates.includes(requested) ? requested : (nextRun ?? dates.at(-1) ?? '');
   const online = useOnline();
   useDashboardStream(date, online && date.length > 0);
   const location = useLocation();
@@ -182,7 +196,9 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
     query.set('date', next);
     setParams(query);
   };
-  if (calendar.isPending) return <LoadingState label="Loading the operating calendar…" />;
+  if (calendar.isPending || clock.isPending) {
+    return <LoadingState label="Loading the operating calendar…" />;
+  }
   if (!calendar.data) {
     return (
       <ErrorState description={message(calendar.error)} onRetry={() => void calendar.refetch()} />
@@ -235,6 +251,15 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
             <>
               <strong>{user.name}</strong>
               <p className="wp-muted">Dispatcher · {user.depotId ?? 'no depot'}</p>
+              {clock.data?.demoNow && (
+                <DemoClock
+                  now={clock.data.demoNow}
+                  date={date}
+                  dates={dates}
+                  // Keep the selected run in the URL so a clock move does not switch dates.
+                  onMoved={() => setDate(date)}
+                />
+              )}
               <SignOut />
             </>
           }
@@ -283,6 +308,19 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
       </div>
     </DispatchContext.Provider>
   );
+}
+
+// The operating clock's Asia/Colombo date. GET /admin/clock exists only in DEMO_MODE; without
+// it the server follows the host clock, so the device's time gives the same day.
+async function operatingToday(): Promise<{ today: string; demoNow: string | null }> {
+  try {
+    const clock = await api('/admin/clock', operatingClockSchema);
+    return { today: clock.now.slice(0, 10), demoNow: clock.now };
+  } catch (cause) {
+    if (!(cause instanceof HttpError) || cause.status !== 404) throw cause;
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Colombo' }).format(new Date());
+    return { today, demoNow: null };
+  }
 }
 
 export function Page({

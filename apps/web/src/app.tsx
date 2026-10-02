@@ -1,18 +1,13 @@
 import { BrowserRouter } from 'react-router-dom';
 import { DesignSystem } from './features/design-system/design-system';
 import { DispatchWorkspaceApp } from './features/dispatch/workspace';
+import { DriverWorkspaceApp } from './features/driver/workspace';
 import { SystemStatus } from './features/health/system-status.tsx';
 import { LoaderWorkspaceApp } from './features/loader/workspace';
 import { StoreWorkspaceApp } from './features/store/workspace';
 
 export function App() {
   const path = window.location.pathname;
-  if (path === '/loader' || path.startsWith('/loader/'))
-    return (
-      <BrowserRouter>
-        <LoaderWorkspaceApp />
-      </BrowserRouter>
-    );
   if (path === '/store' || path.startsWith('/store/')) {
     return (
       <BrowserRouter>
@@ -27,6 +22,20 @@ export function App() {
       </BrowserRouter>
     );
   }
+  if (path === '/driver' || path.startsWith('/driver/')) {
+    return (
+      <BrowserRouter>
+        <DriverWorkspaceApp />
+      </BrowserRouter>
+    );
+  }
+  if (path === '/loader' || path.startsWith('/loader/')) {
+    return (
+      <BrowserRouter>
+        <LoaderWorkspaceApp />
+      </BrowserRouter>
+    );
+  }
   if (path.replace(/\/$/, '') === '/dev/design-system') return <DesignSystem />;
   return (
     <main className="app">
@@ -35,6 +44,7 @@ export function App() {
       <a href="/dev/design-system">Explore the design system</a>
       <a href="/dispatch">Open Dispatcher workspace</a>
       <a href="/loader">Open Loader workspace</a>
+      <a href="/driver">Open Driver workspace</a>
       <a href="/store">Open Store Manager workspace</a>
       <SystemStatus />
     </main>

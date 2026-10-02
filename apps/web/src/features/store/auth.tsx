@@ -3,6 +3,7 @@ import { currentUserResponseSchema } from '@waypoint/shared';
 import { useState } from 'react';
 import { Button, Card } from '../../components/waypoint';
 import { api, message } from '../../lib/api';
+import { replaceSession } from '../../lib/session';
 export function StoreSignIn() {
   const client = useQueryClient();
   const [email, setEmail] = useState('');
@@ -14,8 +15,7 @@ export function StoreSignIn() {
         body: JSON.stringify({ email, password }),
       }),
     onSuccess: (data) => {
-      client.clear();
-      client.setQueryData(['session'], data);
+      replaceSession(client, data);
     },
   });
   return (
