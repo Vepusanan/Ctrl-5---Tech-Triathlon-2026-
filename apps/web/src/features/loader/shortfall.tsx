@@ -65,6 +65,7 @@ export function ShortfallForm({ flow }: { flow: LoadFlow }) {
               <span className="wp-sr-only">Order</span>
               <select
                 value={orderId}
+                disabled={flow.busy}
                 onChange={(event) => {
                   setOrderId(event.target.value);
                   setQty(1);
@@ -91,6 +92,7 @@ export function ShortfallForm({ flow }: { flow: LoadFlow }) {
               label="Units affected"
               showMax={false}
               large
+              disabled={flow.busy}
               onChange={setQty}
             />
           </div>
@@ -108,6 +110,7 @@ export function ShortfallForm({ flow }: { flow: LoadFlow }) {
                   name="shortfall-type"
                   value={option}
                   checked={type === option}
+                  disabled={flow.busy}
                   onChange={() => setType(option)}
                 />
                 <SharedIcon src={issueTypeIcon[option].src} size={issueTypeIcon[option].size} />
@@ -118,7 +121,12 @@ export function ShortfallForm({ flow }: { flow: LoadFlow }) {
 
           <label className="loader-field">
             <span className="loader-field-label">Note (optional)</span>
-            <textarea rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
+            <textarea
+              rows={2}
+              value={note}
+              disabled={flow.busy}
+              onChange={(event) => setNote(event.target.value)}
+            />
           </label>
         </section>
 
@@ -150,7 +158,7 @@ export function ShortfallForm({ flow }: { flow: LoadFlow }) {
         status={
           <p className="loader-status-line">
             <SharedIcon src="2037-861-imgIconClock1" size={16} />
-            First stop at {time(first)}
+            {flow.busy ? 'Sending to dispatcher…' : `First stop at ${time(first)}`}
           </p>
         }
       >
@@ -168,7 +176,7 @@ export function ShortfallForm({ flow }: { flow: LoadFlow }) {
           busy={flow.busy}
           disabled={!valid || !flow.online}
         >
-          Send to dispatcher
+          {flow.busy ? 'Sending…' : flow.failed ? 'Retry' : 'Send to dispatcher'}
         </Button>
       </ActionBar>
     </form>

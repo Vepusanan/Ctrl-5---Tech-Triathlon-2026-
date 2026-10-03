@@ -393,19 +393,89 @@ small {
 .wp-loading {
   min-height: 240px;
 }
+/* Figma X03 · Loading: subtle blocks with the radius of the content they stand in for. */
 .wp-skeleton {
-  height: 24px;
-  background: var(--color-bg-muted);
-  border-radius: var(--radius-sm);
-  margin-top: var(--space-16);
+  display: block;
+  flex: none;
+  width: 100%;
+  max-width: 100%;
+  height: 14px;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-pill);
   animation: wp-pulse 1.5s ease-in-out infinite alternate;
 }
-.wp-skeleton:last-child {
-  width: 60%;
+.wp-skeleton--title {
+  height: 20px;
+  border-radius: var(--radius-sm);
+}
+.wp-skeleton--number {
+  height: 32px;
+  border-radius: var(--radius-sm);
+}
+.wp-skeleton--block {
+  height: 120px;
+  border-radius: var(--radius-nested);
+}
+.wp-skeleton--field {
+  height: 40px;
+  border-radius: var(--radius-field);
+}
+.wp-skeleton--button {
+  height: var(--touch-target);
+}
+.wp-skeleton[data-on="subtle"] {
+  background: var(--color-bg-muted);
+}
+.wp-skeleton[data-on="inverse"] {
+  background: var(--color-bg-inverse-2);
+}
+.wp-skeleton-rows {
+  display: flex;
+  flex-direction: column;
+}
+.wp-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: 64px;
+}
+.wp-skeleton-stack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: 0;
+}
+.wp-table td .wp-skeleton {
+  margin: 4px 0;
+}
+.wp-table .wp-numeric .wp-skeleton {
+  margin-left: auto;
 }
 @keyframes wp-pulse {
   to {
     opacity: 0.4;
+  }
+}
+/* Figma X03 · Working: the label stays, a 12px spinner joins it, and a second tap is blocked. */
+.wp-button[aria-busy="true"] {
+  cursor: progress;
+  opacity: 1;
+}
+.wp-button[aria-busy="true"]::before {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--radius-pill);
+  animation: wp-spin 0.8s linear infinite;
+}
+@keyframes wp-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 .wp-shell {
@@ -840,7 +910,8 @@ kbd {
     scroll-behavior: auto;
   }
   .wp-skeleton,
-  .wp-button {
+  .wp-button,
+  .wp-button::before {
     animation: none;
     transition: none;
   }

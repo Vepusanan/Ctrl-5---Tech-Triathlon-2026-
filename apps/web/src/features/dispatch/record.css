@@ -1,0 +1,159 @@
+/* D04a · Trip record · view only (Figma 2106:11293) */
+.tr-viewonly {
+  background: var(--color-bg-surface);
+}
+.tr-row {
+  display: grid;
+  grid-template-columns: minmax(0, 757fr) minmax(0, 371fr);
+  gap: var(--space-16);
+  min-height: 340px;
+}
+.tr-card {
+  gap: var(--space-12);
+}
+.tr-delivery {
+  flex: 1;
+}
+.tr-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tr-owner {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+.tr-scroll {
+  overflow-x: auto;
+}
+.tr-table strong {
+  display: block;
+  font-weight: 500;
+}
+.tr-col-stop {
+  width: 168px;
+}
+.tr-col-num {
+  width: 102px;
+}
+.tr-col-exception {
+  width: 192px;
+}
+.tr-lock {
+  color: var(--color-text-tertiary);
+}
+.tr-owners {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  color: var(--color-text-inverse-muted);
+  font-size: var(--text-small);
+  line-height: 17px;
+  white-space: nowrap;
+}
+.tr-owners li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tr-owners .wp-avatar {
+  background: var(--color-bg-inverse-2);
+}
+.tr-owners li[data-you] .wp-avatar {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+}
+.tr-owner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tr-owner-text strong {
+  color: var(--color-text-inverse);
+  font-weight: 500;
+}
+.tr-stops,
+.tr-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-16);
+}
+.tr-stops li {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--space-16);
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-subtle);
+}
+.tr-stop-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tr-stop-head strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 var(--text-body) / 21px var(--font-body);
+}
+.tr-seq {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+  font: 600 var(--text-caption) / 14px var(--font-body);
+}
+.tr-stop-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.tr-well {
+  width: 32px;
+  height: 32px;
+}
+.tr-proofs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+.tr-proof {
+  display: grid;
+  place-items: center;
+  height: 56px;
+  border-radius: var(--radius-field);
+  background: var(--color-bg-surface);
+  color: var(--color-text-tertiary);
+}
+.tr-proof[data-captured] {
+  background: var(--color-bg-muted);
+  color: var(--color-text-primary);
+}
+.tr-confirm {
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+@media (max-width: 1100px) {
+  .tr-row,
+  .tr-stops,
+  .tr-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

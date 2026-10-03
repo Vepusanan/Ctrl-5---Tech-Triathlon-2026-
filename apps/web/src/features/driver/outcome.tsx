@@ -1,14 +1,16 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { Button, ErrorState, LoadingState } from '../../components/waypoint';
+import { Button, ErrorState } from '../../components/waypoint';
 import { message } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { time } from '../store/shared';
-import { FAILURE_REASONS, reasonIcon } from './labels';
+import { DISPATCH_OFFICE, outletContact, telHref } from './fixtures';
+import { cartons, FAILURE_REASONS, reasonIcon } from './labels';
 import { loadStop } from './offline/queries';
 import { DeliveryForm } from './pod';
 import { DriverHeader, DriverIcon, Strip, ThumbZone } from './shell';
+import { StopSkeleton } from './skeletons';
 import { useDriverOutlets } from './trip';
 import { type StopAction, useDriver } from './workspace';
 
@@ -20,8 +22,8 @@ const minutes = (clock: string) => {
 };
 
 // DR04 + DR04a. Recorded only from an arrived stop. Delivered needs a POD, uploaded first and then
-// referenced by the delivered event; failed needs a reason from the list. Partial is not an
-// outcome the API records, so the control offers the two it does.
+// referenced by the delivered event; failed needs a reason from the list. Figma's third segment,
+// Partial, is drawn but not selectable: the API has no partial outcome or delivered quantity.
 export function StopOutcome() {
   const { stopId = '' } = useParams();
   const { user, record, stamp } = useDriver();
@@ -37,11 +39,11 @@ export function StopOutcome() {
   // Saved on the phone first; the outbox uploads the POD and sends the event (§8.2).
   const action = useMutation({
     mutationFn: (run: StopAction) => record(run),
-    onSuccess: () => navigate(`/driver/stops/${stopId}`, { replace: true }),
+    onSuccess: () => navigate(`/driver/stops/${stopId}/saved`, { replace: true }),
     networkMode: 'always',
   });
 
-  if (stop.isPending) return <LoadingState label="Loading the stop…" />;
+  if (stop.isPending) return <StopSkeleton back={`/driver/stops/${stopId}`} backLabel="Stop" />;
   if (!stop.data) {
     return <ErrorState description={message(stop.error)} onRetry={() => void stop.refetch()} />;
   }
@@ -60,16 +62,19 @@ export function StopOutcome() {
       <DriverHeader
         back={`/driver/stops/${detail.id}`}
         backLabel="Stop"
-        eyebrow={`Stop ${detail.seq} · ${detail.order.units} ${detail.order.units === 1 ? 'unit' : 'units'}`}
+        eyebrow={`Stop ${detail.seq} · ${cartons(detail.order.units)}`}
         title={`${outlet?.district ?? detail.order.outletId} · outcome`}
       />
 
       <fieldset className="driver-segments">
         <legend className="wp-sr-only">Outcome</legend>
-        {(['delivered', 'failed'] as const).map((option) => (
+        {(['delivered', 'partial', 'failed'] as const).map((option) => (
           <label
             key={option}
-            className={`driver-segment${outcome === option ? ' driver-segment--active' : ''}`}
+            className={`driver-segment${outcome === option ? ' driver-segment--active' : ''}${
+              option === 'partial' ? ' driver-segment--off' : ''
+            }`}
+            title={option === 'partial' ? 'Partial deliveries cannot be recorded yet' : undefined}
           >
             <input
               className="wp-sr-only"
@@ -77,10 +82,10 @@ export function StopOutcome() {
               name="stop-outcome"
               value={option}
               checked={outcome === option}
-              disabled={busy}
-              onChange={() => setOutcome(option)}
+              disabled={busy || option === 'partial'}
+              onChange={() => option !== 'partial' && setOutcome(option)}
             />
-            {option === 'delivered' ? 'Delivered' : 'Failed'}
+            {option === 'delivered' ? 'Delivered' : option === 'partial' ? 'Partial' : 'Failed'}
           </label>
         ))}
       </fieldset>
@@ -116,6 +121,7 @@ export function StopOutcome() {
       {outcome === 'delivered' && !detail.pod && (
         <DeliveryForm
           stop={detail}
+          recipient={outletContact(detail.order.outletId).name}
           busy={busy}
           onSubmit={(pod) => action.mutate({ stop: detail, type: 'delivered', pod })}
         />
@@ -160,12 +166,15 @@ export function StopOutcome() {
             </span>
           </section>
           <Strip tone="info" icon={<DriverIcon name="info-info" size={16} />}>
-            No proof of delivery for a failed stop. Goods return to the depot.
+            No POD for a failed stop. Goods return to the depot.
           </Strip>
           <ThumbZone>
             <Button type="submit" className="driver-cta" busy={busy} disabled={!reason}>
               Record failed delivery
             </Button>
+            <a className="driver-link" href={telHref(DISPATCH_OFFICE.phone)}>
+              Call dispatcher
+            </a>
           </ThumbZone>
         </form>
       )}

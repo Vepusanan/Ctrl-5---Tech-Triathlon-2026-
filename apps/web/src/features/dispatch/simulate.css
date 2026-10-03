@@ -1,0 +1,131 @@
+/* D07 · What-if simulator (Figma 2040:3236) */
+.sim-row {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 371px minmax(0, 1fr);
+  gap: var(--space-16);
+}
+.sim-levers {
+  gap: 6px;
+}
+.sim-lever {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: 10px 0;
+}
+.sim-lever[data-on] .wp-icon-well {
+  background: var(--color-bg-muted);
+}
+.sim-lever-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.sim-lever-text strong {
+  color: var(--color-text-primary);
+  font: 500 var(--text-body) / 21px var(--font-body);
+}
+.sim-cost {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  margin-top: auto;
+  padding: var(--space-16);
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+}
+.sim-cost p {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  color: var(--color-text-inverse-muted);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.sim-cost strong {
+  color: var(--color-text-inverse);
+  font: 600 var(--text-title) / 26px var(--font-display);
+  letter-spacing: -0.24px;
+  font-variant-numeric: tabular-nums;
+}
+.sim-chart {
+  gap: 14px;
+}
+.sim-legend {
+  display: flex;
+  gap: 14px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.sim-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sim-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-data-cat-2);
+}
+.sim-legend i[data-scenario] {
+  background: var(--color-data-accent);
+}
+.sim-groups {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--space-24);
+  min-height: 360px;
+}
+.sim-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px var(--space-12);
+  margin: 0;
+}
+.sim-pair > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.sim-bar {
+  width: 100%;
+  border-radius: 16px;
+  background: var(--color-data-cat-2);
+  transition: height 160ms;
+}
+.sim-bar[data-scenario] {
+  background: var(--color-data-accent);
+}
+.sim-pair figcaption {
+  grid-column: 1 / -1;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+  text-align: center;
+}
+@media (max-width: 1100px) {
+  .sim-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sim-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sim-bar {
+    transition: none;
+  }
+}

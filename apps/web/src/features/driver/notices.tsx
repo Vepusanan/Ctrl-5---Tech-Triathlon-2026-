@@ -6,14 +6,25 @@ import {
   notificationListResponseSchema,
 } from '@waypoint/shared';
 import { Link, useParams } from 'react-router-dom';
-import { Button, EmptyState, ErrorState, LoadingState } from '../../components/waypoint';
+import { Button, EmptyState, ErrorState, LoadingLabel } from '../../components/waypoint';
 import { api, message } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { issueTypeLabel } from '../loader/labels';
 import { day, time } from '../store/shared';
 import { useDriverRefresh } from './actions';
+import { cartons } from './labels';
 import { loadTrip, loadTrips } from './offline/queries';
-import { DriverHeader, DriverIcon, InverseCard, ListRow, ThumbZone } from './shell';
+import { cachedTrip } from './offline/store';
+import {
+  DriverHeader,
+  DriverIcon,
+  Glyph,
+  type GlyphName,
+  InverseCard,
+  ListRow,
+  ThumbZone,
+} from './shell';
+import { NoticeSkeleton, NoticesSkeleton, RouteSkeleton } from './skeletons';
 import { useDriver } from './workspace';
 
 const noticeTitle: Record<NotificationType, string> = {
@@ -27,6 +38,17 @@ const noticeTitle: Record<NotificationType, string> = {
   order_confirmed: 'Order confirmed',
   order_deferred: 'Order deferred',
   receipt_discrepancy: 'Receipt discrepancy',
+};
+
+// DR07 `2106:10706`–`2106:10741`: what the notice is about decides the icon, and whether it still
+// needs the driver decides the tint.
+const noticeIcon: Partial<Record<NotificationType, GlyphName>> = {
+  plan_changed: 'route',
+  plan_published: 'route',
+  sync_conflict: 'user',
+  delivery_failed: 'x',
+  delivery_issue: 'info',
+  loading_shortfall: 'info',
 };
 
 function useNotices() {
@@ -63,7 +85,7 @@ export function Notices() {
     return (
       <>
         {header}
-        <LoadingState label="Loading notices…" />
+        <NoticesSkeleton />
       </>
     );
   }
@@ -121,9 +143,25 @@ function NoticeList({
           <Link key={item.id} className="driver-row-link" to={`/driver/notices/${item.id}`}>
             <ListRow
               icon={
-                <DriverIcon name={item.actionRequired ? 'tab-trip' : 'check-success'} size={20} />
+                <>
+                  <Glyph
+                    name={
+                      item.actionRequired || item.type === 'sync_conflict'
+                        ? (noticeIcon[item.type] ?? 'info')
+                        : item.acknowledgedAt
+                          ? 'check'
+                          : (noticeIcon[item.type] ?? 'check')
+                    }
+                    size={20}
+                  />
+                  {item.actionRequired && <i className="driver-well-dot" />}
+                </>
               }
-              tone={item.actionRequired ? 'warning' : 'success'}
+              {...(item.actionRequired
+                ? { tone: 'warning' as const }
+                : item.type === 'sync_conflict'
+                  ? {}
+                  : { tone: 'success' as const })}
               title={noticeTitle[item.type]}
               detail={[
                 item.entityType === 'trip' ? tripLabel.get(item.entityId) : undefined,
@@ -159,13 +197,20 @@ export function NoticeDetail() {
     enabled: tripId !== '',
     networkMode: 'always',
   });
+  // The change the phone found on its last sync, if it has not been acknowledged yet (§8.4).
+  const change = useQuery({
+    queryKey: queryKeys.driver.route(user.id, tripId),
+    queryFn: async () => (await cachedTrip(user.id, tripId))?.routeChange ?? null,
+    enabled: tripId !== '',
+    networkMode: 'always',
+  });
   const acknowledge = useMutation({
     mutationFn: (id: string) =>
       api(`/notifications/${id}/acknowledge`, notificationFeedItemSchema, { method: 'POST' }),
     onSettled: refresh,
   });
 
-  if (notices.isPending) return <LoadingState label="Loading the notice…" />;
+  if (notices.isPending) return <NoticeSkeleton />;
   if (!notice) {
     return (
       <ErrorState
@@ -191,6 +236,12 @@ export function NoticeDetail() {
       {detail && (
         <InverseCard>
           <div className="driver-version">
+            {change.data && change.data.since !== detail.version && (
+              <>
+                <span className="driver-version-from">v{change.data.since}</span>
+                <Glyph name="arrow" size={18} />
+              </>
+            )}
             <strong className="driver-hero-number">v{detail.version}</strong>
           </div>
           <small className="driver-inverse-muted">
@@ -198,13 +249,18 @@ export function NoticeDetail() {
           </small>
         </InverseCard>
       )}
-      {trip.isPending && tripId !== '' && <LoadingState label="Loading the route…" rows={2} />}
+      {trip.isPending && tripId !== '' && (
+        <>
+          <LoadingLabel label="Loading the route…" />
+          <RouteSkeleton />
+        </>
+      )}
       {trip.error && (
         <ErrorState description={message(trip.error)} onRetry={() => void trip.refetch()} />
       )}
       {detail && (
-        <section className="driver-card driver-changes" aria-label="Current route">
-          <h2 className="driver-headline">Current route</h2>
+        <section className="driver-card driver-changes" aria-label="What changed">
+          <h2 className="driver-headline">What changed</h2>
           {detail.exceptions.map((issue) => {
             const stop = stops.find((item) => item.order.id === issue.orderId);
             return (
@@ -212,7 +268,7 @@ export function NoticeDetail() {
                 <ListRow
                   icon={<DriverIcon name="minus-danger" size={20} />}
                   tone="surface"
-                  title={`${stop?.order.outletId ?? 'Stop'} · ${issue.qty} ${issue.qty === 1 ? 'unit' : 'units'} ${issueTypeLabel[issue.type].toLowerCase()}`}
+                  title={`${stop?.order.outletId ?? 'Stop'} · ${cartons(issue.qty)} ${issueTypeLabel[issue.type].toLowerCase()}`}
                   detail={
                     issue.acknowledgedAt ? 'Dispatcher informed' : 'Waiting for the dispatcher'
                   }
@@ -224,11 +280,35 @@ export function NoticeDetail() {
             <ListRow
               icon={<DriverIcon name="check-success" size={20} />}
               tone="surface"
-              title={`${stops.length} ${stops.length === 1 ? 'stop' : 'stops'} in this order`}
+              title={
+                change.data &&
+                change.data.added.length +
+                  change.data.removed.length +
+                  change.data.reordered.length >
+                  0
+                  ? [
+                      change.data.added.length > 0 ? `${change.data.added.length} added` : null,
+                      change.data.removed.length > 0
+                        ? `${change.data.removed.length} removed`
+                        : null,
+                      change.data.reordered.length > 0
+                        ? `${change.data.reordered.length} moved`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : `${stops.length} ${stops.length === 1 ? 'stop' : 'stops'} in this order`
+              }
               detail={stops.map((stop) => `${stop.seq} ${stop.order.outletId}`).join(' · ')}
             />
           </div>
         </section>
+      )}
+      {detail && (
+        <p className="driver-plain">
+          <Glyph name="cloud" />
+          <span>Route v{detail.version} saved on this phone</span>
+        </p>
       )}
       {acknowledge.error && (
         <div className="driver-banner driver-banner--danger" role="alert">

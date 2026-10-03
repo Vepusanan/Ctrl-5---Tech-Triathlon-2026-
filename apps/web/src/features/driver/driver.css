@@ -159,13 +159,6 @@
   color: var(--color-text-inverse);
 }
 
-.driver-offline p {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 17px;
-}
-
 .driver-offline small {
   color: var(--color-text-inverse-muted);
   font-size: 11px;
@@ -208,20 +201,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-16);
-}
-
-.driver-sync-ring {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  border: 6px solid var(--color-status-warning);
-  border-radius: var(--radius-pill);
-}
-
-.driver-sync-ring--clear {
-  border-color: var(--color-status-success);
 }
 
 /* Cards. */
@@ -895,15 +874,6 @@ a.driver-card:focus-visible,
   outline-offset: 2px;
 }
 
-.driver-count {
-  display: flex;
-  align-items: center;
-}
-
-.driver-count div {
-  display: grid;
-}
-
 .driver-count span {
   color: var(--color-text-tertiary);
   font-size: 13px;
@@ -1061,20 +1031,499 @@ a.driver-card:focus-visible,
   gap: var(--space-12);
 }
 
-.driver-profile .driver-row-text strong {
-  font-family: var(--font-display);
-  font-size: 17px;
-  line-height: 22px;
-}
-
-.driver-signout .wp-button {
-  justify-self: start;
-  color: var(--color-status-danger);
-  font-size: 15px;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .driver-cta.wp-button {
     transition: none;
   }
+}
+
+/* ---- Figma parity additions (DR01–DR08) ---- */
+
+/* Tinted single-colour icon from public/waypoint/icons. */
+.driver-glyph {
+  display: inline-block;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--driver-glyph) center / contain no-repeat;
+  mask: var(--driver-glyph) center / contain no-repeat;
+}
+
+/* Status chip (Figma "Status" `8:210`): icon, label and tone together. */
+.driver-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-neutral-subtle);
+  color: var(--color-status-neutral);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+.driver-chip--success {
+  background: var(--color-status-success-subtle);
+  color: var(--color-status-success);
+}
+
+.driver-chip--warning {
+  background: var(--color-status-warning-subtle);
+  color: var(--color-status-warning);
+}
+
+.driver-chip--danger {
+  background: var(--color-status-danger-subtle);
+  color: var(--color-status-danger);
+}
+
+.driver-chip--info {
+  background: var(--color-status-info-subtle);
+  color: var(--color-status-info);
+}
+
+/* Offline bar `2035:565`: text stack and the pending pill. */
+a.driver-offline {
+  text-decoration: none;
+}
+
+a.driver-offline:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.driver-offline-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.driver-offline-text strong {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
+}
+
+.driver-offline-count {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-warning);
+  color: var(--color-text-inverse);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+/* Icon wells in the 40px and 36px sizes, and their tints for a Glyph. */
+.driver-well--small {
+  width: 40px;
+  height: 40px;
+  color: var(--color-text-secondary);
+}
+
+.driver-well--mini {
+  width: 36px;
+  height: 36px;
+  color: var(--color-text-secondary);
+}
+
+.driver-well--inverse {
+  background: var(--color-bg-inverse-2);
+  color: var(--color-text-inverse);
+}
+
+.driver-well--success {
+  color: var(--color-status-success);
+}
+
+.driver-well--warning {
+  position: relative;
+  color: var(--color-status-warning);
+}
+
+.driver-well-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-danger);
+}
+
+.driver-row--link {
+  border-radius: var(--radius-field);
+}
+
+.driver-row--button {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.driver-row--button:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-field);
+}
+
+/* Plain footnote row with an icon, and its white-card variant (DR05b `2046:5819`). */
+.driver-plain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.driver-plain--card {
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+}
+
+.driver-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Secondary action under the primary button (DR04a, DR05d): underlined text, 52px target. */
+.driver-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  min-height: var(--driver-target);
+  padding: 0 var(--space-24);
+  color: var(--color-text-primary);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 22px;
+  text-decoration: underline;
+  text-underline-position: from-font;
+}
+
+.driver-link:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-pill);
+}
+
+.driver-thumb-note {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* DR05: a recorded stop is one row. */
+.driver-stop-done {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+/* DR04: Partial is drawn but cannot be chosen; carton stepper `2046:5521`. */
+.driver-segment--off {
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+}
+
+.driver-count {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.driver-stepper {
+  display: flex;
+  flex: none;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-subtle);
+}
+
+.driver-stepper button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+}
+
+.driver-stepper button:disabled {
+  opacity: 0.4;
+}
+
+.driver-stepper output {
+  width: 44px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: -0.17px;
+  text-align: center;
+}
+
+/* DR05a saved offline `2046:5670`, `2046:5677`. */
+.driver-saved {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin-top: auto;
+  text-align: center;
+}
+
+.driver-saved-mark {
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-success-subtle);
+}
+
+.driver-saved-mark > span {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-success);
+  color: var(--color-text-inverse);
+}
+
+.driver-saved-mark--failed {
+  background: var(--color-status-danger-subtle);
+}
+
+.driver-saved-mark--failed > span {
+  background: var(--color-status-danger);
+}
+
+.driver-saved-meta {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+/* Centred with the tick between the offline bar and the thumb zone. */
+.driver-record {
+  gap: var(--space-8);
+  margin-bottom: auto;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.driver-record div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.driver-record dt {
+  color: var(--color-text-inverse-muted);
+}
+
+.driver-record dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* DR05b / DR05c donut `2046:5768`: 96px ring, amber while waiting, green when clear. */
+.driver-donut {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border: 12px solid var(--color-status-warning);
+  border-radius: var(--radius-pill);
+}
+
+.driver-donut--clear {
+  border-color: var(--color-data-pos);
+}
+
+.driver-donut strong {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: -0.2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.driver-route-current {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.driver-route-current .driver-row-text span {
+  color: var(--color-text-inverse-muted);
+}
+
+/* DR05d conflict `2046:6089`, `2046:6103`. */
+.driver-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 10px;
+}
+
+.driver-compare-card {
+  gap: 6px;
+  justify-items: start;
+  overflow-wrap: anywhere;
+}
+
+.driver-happens {
+  gap: 10px;
+}
+
+.driver-happens p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+/* DR06 version jump `2046:4772`. */
+.driver-version-from {
+  color: var(--color-text-inverse-muted);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.driver-version .driver-glyph {
+  color: var(--color-text-inverse-muted);
+}
+
+/* DR08 account `2106:10813`, `2106:10858`, `2106:10900`. */
+.driver-week {
+  gap: var(--space-8);
+}
+
+.driver-week-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.driver-week-head strong {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.driver-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.driver-dots i {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-data-pos);
+}
+
+.driver-dots i.driver-dot--late {
+  border: 2px solid var(--color-status-danger);
+  background: none;
+}
+
+.driver-language {
+  display: grid;
+  gap: var(--space-8);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-8) 0;
+  border: 0;
+}
+
+.driver-language legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.driver-signout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--driver-target);
+  padding: var(--space-12) var(--space-16);
+  border: 0;
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-surface);
+  color: var(--color-status-danger);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.driver-signout strong {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.driver-signout span:last-child {
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.driver-signout:disabled {
+  cursor: not-allowed;
+}
+
+.driver-signout:disabled strong,
+.driver-signout:disabled .driver-glyph {
+  opacity: 0.5;
+}
+
+.driver-signout:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.driver-profile .driver-row-text strong {
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 22px;
 }

@@ -1,15 +1,16 @@
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import type { DeliveryStop, Outlet, SyncTripChanged, TripStopDetail } from '@waypoint/shared';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Button, ErrorState, LoadingState, StatusBadge } from '../../components/waypoint';
+import { Button, ErrorState, StatusBadge } from '../../components/waypoint';
 import { message } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { day, time } from '../store/shared';
 import { useDepart } from './actions';
-import { percent, stopBadge, stopTitle, tripBadge, windowRange } from './labels';
+import { cartons, percent, stopBadge, stopTitle, tripBadge, windowRange } from './labels';
 import { loadOutlets, loadStop, loadTrip } from './offline/queries';
 import { cachedTrip, setRouteChange } from './offline/store';
-import { DriverHeader, DriverIcon, Strip, ThumbZone } from './shell';
+import { Chip, DriverHeader, DriverIcon, Strip, ThumbZone } from './shell';
+import { TripSkeleton } from './skeletons';
 import { useDriver, useStopSync } from './workspace';
 
 export function useDriverOutlets(userId: string) {
@@ -27,7 +28,7 @@ function stopNotes(outlet: Outlet | undefined, chilled: boolean, units: number):
   if (outlet?.parkingConstraint === 'van_only') notes.push('Van only');
   if (outlet?.mallWindow) notes.push(`Mall ${outlet.mallWindow.open}–${outlet.mallWindow.close}`);
   if (chilled) notes.push('Chilled');
-  notes.push(`${units} ${units === 1 ? 'unit' : 'units'}`);
+  notes.push(cartons(units));
   return notes.join(' · ');
 }
 
@@ -49,7 +50,7 @@ export function DepartError({ error, stale }: { error: Error | null; stale: bool
 // driver-scoped /outlets, and the shifted ETA from /stops/:id, which opens only after departure.
 export function TripOverview() {
   const { tripId = '' } = useParams();
-  const { user, online, record } = useDriver();
+  const { user, online, record, sync } = useDriver();
   const navigate = useNavigate();
   const trip = useQuery({
     queryKey: queryKeys.driver.trip(user.id, tripId),
@@ -80,7 +81,7 @@ export function TripOverview() {
     networkMode: 'always',
   });
 
-  if (trip.isPending) return <LoadingState label="Loading the trip…" />;
+  if (trip.isPending) return <TripSkeleton />;
   if (!trip.data) {
     return <ErrorState description={message(trip.error)} onRetry={() => void trip.refetch()} />;
   }
@@ -120,7 +121,13 @@ export function TripOverview() {
           <span>
             of {stops.length} {stops.length === 1 ? 'stop' : 'stops'} done
           </span>
-          <span>{day(detail.run.serviceDate)}</span>
+          {sync.pending > 0 ? (
+            <Chip tone="warning" icon="cloud">
+              Saved here
+            </Chip>
+          ) : (
+            <span>{day(detail.run.serviceDate)}</span>
+          )}
         </div>
         <div
           className="driver-bar"
@@ -174,6 +181,12 @@ export function TripOverview() {
           </li>
         ))}
       </ol>
+      {!online && (
+        <p className="driver-note">
+          <DriverIcon name="check" size={16} />
+          All actions still work offline
+        </p>
+      )}
       {departed && !next && (
         <Strip tone="success" icon={<DriverIcon name="check" size={16} />}>
           Every stop on this trip has an outcome. Return to the depot.
@@ -281,13 +294,44 @@ function StopCard({
       ) : null}
     </>
   );
+  const recorded = status === 'delivered' || status === 'failed';
+  const outcome = local.entries.findLast(
+    (entry) => entry.type === status && entry.status !== 'conflict',
+  );
+  const at = live?.pod?.clientTime ?? outcome?.clientTime;
+  // DR05 `2046:5417`: a recorded stop shrinks to one row, and says so while it waits on the phone.
+  const compact = (
+    <div className="driver-stop-done">
+      {marker}
+      <div className="driver-row-text">
+        <strong>{outlet?.district ?? stop.order.outletId}</strong>
+        <span>
+          {status === 'delivered'
+            ? `Delivered${at ? ` ${time(at)}` : ''} · POD saved`
+            : `Not delivered${at ? ` ${time(at)}` : ''}${live?.failureReason ? ` · ${live.failureReason}` : ''}`}
+        </span>
+      </div>
+      {local.conflict ? (
+        <Chip tone="danger" icon="xoct">
+          Conflict
+        </Chip>
+      ) : local.pending ? (
+        <Chip tone="warning" icon="cloud">
+          Saved
+        </Chip>
+      ) : (
+        <StatusBadge status={badge.status} {...(badge.label ? { label: badge.label } : {})} />
+      )}
+    </div>
+  );
   const className = `driver-card driver-stop${next ? ' driver-stop--next' : ''}`;
+  const content = recorded ? compact : body;
   return linked ? (
     <Link className={className} to={`/driver/stops/${stop.id}`}>
-      {body}
+      {content}
     </Link>
   ) : (
-    <div className={className}>{body}</div>
+    <div className={className}>{content}</div>
   );
 }
 

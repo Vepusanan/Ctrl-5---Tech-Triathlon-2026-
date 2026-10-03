@@ -1,0 +1,215 @@
+/* D10 · Analytics & forecast (Figma 2043:3551) */
+.an-row {
+  display: grid;
+  grid-template-columns: minmax(0, 757fr) minmax(0, 371fr);
+  gap: var(--space-16);
+}
+.an-row--three {
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.an-row > .d-dark {
+  min-height: 412px;
+}
+.an-forecast {
+  gap: 10px;
+  min-height: 412px;
+}
+.an-head {
+  align-items: flex-start;
+}
+.an-predicted {
+  color: var(--color-intel-predict);
+}
+.an-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.an-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.an-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--color-data-accent);
+}
+.an-legend i[data-kind="predicted"] {
+  border: 1px dashed var(--color-intel-predict);
+  background: var(--color-intel-predict-subtle);
+}
+.an-legend i[data-kind="capacity"] {
+  width: 18px;
+  height: 2px;
+  border-radius: 0;
+  background: var(--color-text-primary);
+}
+.an-chart {
+  position: relative;
+  height: 230px;
+}
+.an-chart ol {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 100%;
+}
+.an-chart li {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.an-bar {
+  width: 100%;
+  border-radius: 16px;
+  background: var(--color-data-accent);
+}
+.an-week {
+  color: var(--color-text-tertiary);
+  font: 500 var(--text-caption) / 15px var(--font-body);
+}
+/* Predicted weeks are violet and dashed, with "~" values. */
+.an-chart li[data-predicted] {
+  color: var(--color-intel-predict);
+}
+.an-chart li[data-predicted] .an-bar {
+  border: 1.5px dashed var(--color-intel-predict);
+  background: var(--color-intel-predict-subtle);
+}
+.an-chart li[data-predicted] .an-week {
+  color: inherit;
+}
+.an-capacity {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-text-primary);
+  pointer-events: none;
+}
+.an-events {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--color-text-secondary);
+}
+.an-events .wp-chip {
+  font-weight: 400;
+}
+.an-balance {
+  gap: var(--space-12);
+}
+.an-balance ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+.an-balance li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.an-balance b {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 44px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-data-cat-2);
+  color: var(--color-text-inverse);
+  font: 600 var(--text-caption) / 14px var(--font-body);
+}
+.an-balance b[data-predicted] {
+  border: 1.5px dashed var(--color-intel-predict);
+  background: var(--color-intel-predict-subtle);
+  color: var(--color-intel-predict);
+}
+.an-actions {
+  gap: 10px;
+}
+.an-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-12);
+  border-radius: var(--radius-nested);
+  background: var(--color-intel-recommend-subtle);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+  text-decoration: none;
+}
+.an-action > span:not(.wp-mask-icon) {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.an-action strong {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+.an-action-icon {
+  color: var(--color-intel-recommend);
+}
+.an-anomaly {
+  gap: 10px;
+}
+.an-anomaly h3 {
+  font: 500 var(--text-small) / 17px var(--font-body);
+  letter-spacing: 0;
+}
+.an-anomaly-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 120px;
+}
+.an-anomaly-bars li {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.an-anomaly-bar {
+  width: 100%;
+  border-radius: 16px;
+  background: var(--color-bg-muted);
+}
+.an-anomaly-bar[data-flagged] {
+  background: var(--color-data-accent);
+}
+@media (max-width: 1100px) {
+  .an-row,
+  .an-row--three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .an-chart {
+    overflow-x: auto;
+  }
+  .an-chart ol {
+    min-width: 640px;
+  }
+}

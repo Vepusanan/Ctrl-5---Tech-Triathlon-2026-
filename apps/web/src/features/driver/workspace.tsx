@@ -1,17 +1,22 @@
-import type { DeliveryStop, User } from '@waypoint/shared';
+import { useQuery } from '@tanstack/react-query';
+import type { DeliveryStop, TripDetail, User } from '@waypoint/shared';
 import { createContext, useContext, useEffect, useRef } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ErrorState, LoadingState } from '../../components/waypoint';
 import { message } from '../../lib/api';
+import { queryKeys } from '../../lib/query-keys';
 import { useOnline } from '../store/shared';
 import { DriverAccount } from './account';
 import { colomboTimestamp, useDriverClock } from './clock';
+import { SyncConflict } from './conflict';
 import { NoticeDetail, Notices } from './notices';
 import { type SyncState, useSyncEngine } from './offline/engine';
+import { loadTrips } from './offline/queries';
 import { enqueue, stopEntries } from './offline/store';
 import { localStopStatus } from './offline/sync-core';
 import type { OutboxEntry, PodBlob } from './offline/types';
 import { StopOutcome } from './outcome';
+import { StopSaved } from './saved';
 import { DriverTabBar, OFFLINE_ICON, OfflineBar, SyncingBar } from './shell';
 import { StopDetail } from './stop';
 import { DriverSync } from './sync';
@@ -45,6 +50,28 @@ interface DriverContextValue {
    */
   record: (action: StopAction) => Promise<void>;
   sync: SyncState;
+  /** The trip the driver is on (or about to start), as last read; null before the first read. */
+  route: { tripId: string; version: number } | null;
+}
+
+/** The API never marks a trip completed: a departed trip with every stop recorded is done. */
+export function tripFinished(trip: TripDetail): boolean {
+  if (trip.status === 'completed') return true;
+  return (
+    trip.status === 'departed' &&
+    trip.stops.every((stop) => stop.status === 'delivered' || stop.status === 'failed')
+  );
+}
+
+/** The first unfinished trip of a published run, in service order (the DR01 hero trip). */
+function currentTrip(trips: readonly TripDetail[]): TripDetail | undefined {
+  return trips
+    .filter((trip) => trip.run.status === 'published')
+    .sort(
+      (left, right) =>
+        left.run.serviceDate.localeCompare(right.run.serviceDate) || left.tripNo - right.tripNo,
+    )
+    .find((trip) => !tripFinished(trip));
 }
 
 const DriverContext = createContext<DriverContextValue | null>(null);
@@ -72,6 +99,13 @@ function DriverLayout({ user }: { user: Driver }) {
   const location = useLocation();
   const clock = useDriverClock(user.id);
   const sync = useSyncEngine(user.id, online);
+  // The same query as My trips: it names the saved route version in the offline bar.
+  const trips = useQuery({
+    queryKey: queryKeys.driver.trips(user.id),
+    queryFn: () => loadTrips(user.id),
+    networkMode: 'always',
+    staleTime: 30_000,
+  });
   // Fetch the offline bar's icon while online; once the connection drops it cannot be loaded.
   const offlineIcon = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
@@ -140,16 +174,24 @@ function DriverLayout({ user }: { user: Driver }) {
     await enqueue(entry, pod);
     void sync.syncNow();
   };
-  // Stop and outcome screens are focus screens without the tab bar (Figma DR03, DR04, DR04a).
+  const onTrip = currentTrip(trips.data?.items ?? []);
+  const route = onTrip ? { tripId: onTrip.id, version: onTrip.version } : null;
+  // Stop and outcome screens are focus screens without the tab bar (Figma DR03, DR04, DR04a, DR05a).
   const focus = location.pathname.startsWith('/driver/stops/');
   return (
-    <DriverContext.Provider value={{ user, online, stamp, clockAt, record, sync }}>
+    <DriverContext.Provider value={{ user, online, stamp, clockAt, record, sync, route }}>
       <div className={`driver-app${focus ? ' driver-app--focus' : ''}`}>
         <a href="#main-content" className="wp-skip">
           Skip to content
         </a>
         <main className="driver-main" id="main-content" tabIndex={-1}>
-          {!online && <OfflineBar pending={sync.pending} lastSyncAt={lastSync} />}
+          {!online && (
+            <OfflineBar
+              pending={sync.pending}
+              lastSyncAt={lastSync}
+              routeVersion={route?.version ?? null}
+            />
+          )}
           {online && sync.pending + sync.conflicts > 0 && (
             <SyncingBar pending={sync.pending} conflicts={sync.conflicts} />
           )}
@@ -158,9 +200,11 @@ function DriverLayout({ user }: { user: Driver }) {
             <Route path="trips/:tripId" element={<TripOverview />} />
             <Route path="stops/:stopId" element={<StopDetail />} />
             <Route path="stops/:stopId/outcome" element={<StopOutcome />} />
+            <Route path="stops/:stopId/saved" element={<StopSaved />} />
             <Route path="notices" element={<Notices />} />
             <Route path="notices/:noticeId" element={<NoticeDetail />} />
             <Route path="sync" element={<DriverSync />} />
+            <Route path="sync/conflicts/:eventId" element={<SyncConflict />} />
             <Route path="account" element={<DriverAccount />} />
             <Route path="*" element={<Navigate to="/driver" replace />} />
           </Routes>

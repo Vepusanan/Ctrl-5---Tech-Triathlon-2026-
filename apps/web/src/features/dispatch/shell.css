@@ -1,0 +1,748 @@
+/*
+ * Dispatcher shell and shared-component styling from Figma (sidebar 2034:673, top bar 2034:768,
+ * tablet 2045:4016, phone 2045:4446). Every rule is scoped to the Dispatcher workspace through
+ * html[data-workspace="dispatch"], which workspace.tsx sets while it is mounted, so the Store,
+ * Loader and Driver workspaces keep the shared look from styles/globals.css.
+ * `:where()` keeps each selector at its original weight plus one element (`body`).
+ */
+
+/* Declarations globals.css still carries that the Figma shell drops. */
+:where(html[data-workspace="dispatch"]) body .wp-badge {
+  border: 0;
+}
+:where(html[data-workspace="dispatch"]) body .wp-action-row,
+:where(html[data-workspace="dispatch"]) body .wp-nav-item {
+  min-height: 0;
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-item > .wp-mask-icon {
+  flex: none;
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-item:hover:not([aria-current]) {
+  background: transparent;
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-footer {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+:where(html[data-workspace="dispatch"]) body .wp-search {
+  max-width: none;
+}
+:where(html[data-workspace="dispatch"]) body .wp-search input {
+  width: auto;
+  min-height: 0;
+}
+
+:where(html[data-workspace="dispatch"]) body .wp-badge {
+  padding: 3px var(--space-8) 3px 6px;
+  line-height: 15px;
+  font-weight: 500;
+}
+:where(html[data-workspace="dispatch"]) body .wp-status {
+  padding: 3px 9px 3px 7px;
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-tag.tone-neutral {
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+}
+:where(html[data-workspace="dispatch"]) body .wp-action-list {
+  gap: var(--space-4);
+}
+:where(html[data-workspace="dispatch"]) body .wp-action-footer {
+  margin-top: auto;
+  padding-top: var(--space-12);
+}
+:where(html[data-workspace="dispatch"]) body .wp-action-row {
+  padding: 10px 0;
+}
+:where(html[data-workspace="dispatch"]) body .wp-action-row > span:nth-child(2) {
+  min-width: 0;
+}
+:where(html[data-workspace="dispatch"]) body .wp-action-row strong,
+:where(html[data-workspace="dispatch"]) body .wp-action-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:where(html[data-workspace="dispatch"]) body .wp-action-row strong {
+  font: 500 var(--text-body) / 21px var(--font-body);
+}
+:where(html[data-workspace="dispatch"]) body .wp-action-row small {
+  margin-top: 2px;
+  color: var(--color-text-tertiary);
+  line-height: 17px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-shell[data-collapsed] {
+  grid-template-columns: minmax(0, 1fr);
+}
+:where(html[data-workspace="dispatch"]) body .wp-shell[data-collapsed] .wp-desktop-sidebar {
+  display: none;
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar {
+  padding: var(--space-20) var(--space-16);
+  gap: 2px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-4) var(--space-8) var(--space-20);
+}
+:where(html[data-workspace="dispatch"]) body .wp-brand {
+  font: 500 16px / 22px var(--font-display);
+  letter-spacing: -0.16px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-brand-row .wp-brand {
+  flex: 1;
+  gap: 10px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+}
+:where(html[data-workspace="dispatch"]) body .wp-brand > span {
+  color: var(--color-text-inverse);
+}
+:where(html[data-workspace="dispatch"]) body .wp-collapse,
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user-more {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+:where(html[data-workspace="dispatch"]) body .wp-collapse {
+  width: 32px;
+  height: 32px;
+  margin: -7px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar nav,
+:where(html[data-workspace="dispatch"]) body .wp-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-group > p {
+  font: 500 var(--text-caption) / 15px var(--font-body);
+  padding: var(--space-16) var(--space-12) 6px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-item {
+  height: 40px;
+  padding: 0 var(--space-12);
+  font: 500 var(--text-label) / 18px var(--font-body);
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-item > span:not(.wp-mask-icon) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:where(html[data-workspace="dispatch"]) body .wp-mask-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask: var(--wp-icon) center / contain no-repeat;
+  mask: var(--wp-icon) center / contain no-repeat;
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-item .wp-mask-icon {
+  color: var(--color-text-tertiary);
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-item:hover {
+  color: var(--color-text-primary);
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-item[aria-current] {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-ambient);
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-item[aria-current] .wp-mask-icon {
+  color: var(--color-data-accent);
+}
+:where(html[data-workspace="dispatch"]) body .wp-nav-item small {
+  padding: 2px var(--space-8);
+  color: var(--color-text-secondary);
+  font: 600 var(--text-caption) / 14px var(--font-body);
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-footer {
+  padding-top: var(--space-16);
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-note {
+  padding: var(--space-16);
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-surface);
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-surface);
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  white-space: nowrap;
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user strong,
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user strong {
+  font: 500 var(--text-small) / 17px var(--font-body);
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user-detail {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-caption);
+  line-height: 15px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user-more {
+  width: 24px;
+  height: 24px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-8));
+  z-index: 20;
+  min-width: 100%;
+  padding: var(--space-8);
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-float);
+}
+:where(html[data-workspace="dispatch"]) body .wp-sidebar-user-menu .wp-button {
+  width: 100%;
+}
+:where(html[data-workspace="dispatch"]) body .wp-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+  font: 600 var(--text-caption) / 14px var(--font-body);
+}
+:where(html[data-workspace="dispatch"]) body .wp-topbar {
+  min-width: 0;
+  padding: 0 var(--space-32);
+  line-height: 18px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-breadcrumb {
+  gap: var(--space-8);
+  min-width: 0;
+  white-space: nowrap;
+}
+:where(html[data-workspace="dispatch"]) body .wp-breadcrumb strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:where(html[data-workspace="dispatch"]) body .wp-search {
+  width: 300px;
+  height: 40px;
+  background: var(--color-bg-surface);
+  padding: 0 14px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-search-label {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+:where(html[data-workspace="dispatch"]) body .wp-search input {
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  font-size: var(--text-label);
+}
+:where(html[data-workspace="dispatch"]) body .wp-search input::placeholder {
+  color: var(--color-text-tertiary);
+  opacity: 1;
+}
+:where(html[data-workspace="dispatch"]) body kbd {
+  font: 500 var(--text-caption) / 15px var(--font-body);
+  color: var(--color-text-secondary);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-context {
+  height: 40px;
+  padding: 0 14px;
+  background: var(--color-bg-surface);
+  font-weight: 500;
+  white-space: nowrap;
+}
+:where(html[data-workspace="dispatch"]) body .wp-context-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-data-pos);
+}
+:where(html[data-workspace="dispatch"]) body .wp-icon-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+}
+:where(html[data-workspace="dispatch"]) body .wp-main {
+  padding: var(--space-8) var(--space-32) var(--space-32);
+}
+:where(html[data-workspace="dispatch"]) body .wp-topbar-sub,
+:where(html[data-workspace="dispatch"]) body .wp-tabbar {
+  display: none;
+}
+:where(html[data-workspace="dispatch"]) body .wp-tabbar a {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch-target);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 6px var(--space-4);
+  color: var(--color-text-tertiary);
+  font: 500 var(--text-caption) / 15px var(--font-body);
+  text-decoration: none;
+}
+:where(html[data-workspace="dispatch"]) body .wp-tabbar a[aria-current] {
+  color: var(--color-text-primary);
+}
+:where(html[data-workspace="dispatch"]) body .wp-tabbar a[aria-current] .wp-mask-icon {
+  color: var(--color-data-accent);
+}
+:where(html[data-workspace="dispatch"]) body .wp-menu.wp-expand {
+  display: inline-flex;
+}
+:where(html[data-workspace="dispatch"]) body .wp-page-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+:where(html[data-workspace="dispatch"]) body .wp-page-header > div:first-child {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-page-header h1 {
+  font: 500 22px / 28px var(--font-display);
+  letter-spacing: -0.22px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-page-header p {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-page-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+}
+:where(html[data-workspace="dispatch"]) body .wp-button--md {
+  min-height: 40px;
+  padding: 0 18px;
+  line-height: 18px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-segmented {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-muted);
+}
+:where(html[data-workspace="dispatch"]) body .wp-segmented button {
+  padding: 5px var(--space-12);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: 500 var(--text-label) / 18px var(--font-body);
+}
+:where(html[data-workspace="dispatch"]) body .wp-segmented button[aria-pressed="true"] {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-float);
+}
+:where(html[data-workspace="dispatch"]) body .wp-delta {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-data-pos);
+  color: var(--color-data-pos-ink);
+  font: 600 var(--text-caption) / 14px var(--font-body);
+  white-space: nowrap;
+}
+:where(html[data-workspace="dispatch"]) body .wp-delta[data-negative] {
+  background: var(--color-data-neg-soft);
+  color: var(--color-status-danger);
+}
+:where(html[data-workspace="dispatch"]) body .wp-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  border-radius: var(--radius-field);
+  background: var(--color-bg-subtle);
+}
+:where(html[data-workspace="dispatch"]) body .wp-dropdown select {
+  height: 100%;
+  padding: 0 32px 0 14px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: 500 var(--text-label) / 18px var(--font-body);
+  appearance: none;
+  cursor: pointer;
+}
+:where(html[data-workspace="dispatch"]) body .wp-dropdown img {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+}
+:where(html[data-workspace="dispatch"]) body .wp-progress {
+  position: relative;
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-subtle);
+}
+:where(html[data-workspace="dispatch"]) body .wp-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-text-primary);
+}
+:where(html[data-workspace="dispatch"]) body .wp-progress[data-tone="positive"] .wp-progress-fill {
+  background: var(--color-data-pos);
+}
+:where(html[data-workspace="dispatch"]) body .wp-progress[data-tone="accent"] .wp-progress-fill {
+  background: var(--color-data-accent);
+}
+:where(html[data-workspace="dispatch"]) body .wp-progress[data-tone="warning"] .wp-progress-fill {
+  background: var(--color-status-warning);
+}
+:where(html[data-workspace="dispatch"]) body .wp-progress[data-tone="danger"] .wp-progress-fill {
+  background: var(--color-status-danger);
+}
+:where(html[data-workspace="dispatch"]) body .wp-progress[data-track="muted"] {
+  background: var(--color-bg-muted);
+}
+:where(html[data-workspace="dispatch"]) body .wp-progress[data-track="inverse"] {
+  background: var(--color-data-track-invert);
+}
+:where(html[data-workspace="dispatch"]) body .wp-progress > i {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--color-text-primary);
+}
+:where(html[data-workspace="dispatch"]) body button.wp-icon-well {
+  padding: 0;
+  border: 0;
+}
+:where(html[data-workspace="dispatch"]) body .wp-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+:where(html[data-workspace="dispatch"]) body .wp-ring svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+:where(html[data-workspace="dispatch"]) body .wp-ring circle {
+  fill: none;
+  stroke: var(--color-bg-muted);
+}
+:where(html[data-workspace="dispatch"]) body .wp-ring circle[data-tone="accent"] {
+  stroke: var(--color-data-accent);
+}
+:where(html[data-workspace="dispatch"]) body .wp-ring circle[data-tone="positive"] {
+  stroke: var(--color-data-pos);
+}
+:where(html[data-workspace="dispatch"]) body .wp-ring circle[data-tone="warning"] {
+  stroke: var(--color-status-warning);
+}
+:where(html[data-workspace="dispatch"]) body .wp-ring circle[data-tone="danger"] {
+  stroke: var(--color-status-danger);
+}
+:where(html[data-workspace="dispatch"]) body .wp-ring-center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  padding: 14px var(--space-16);
+  border-radius: var(--radius-nested);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-banner-icon {
+  margin-top: 1px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-banner > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+:where(html[data-workspace="dispatch"]) body .wp-banner strong {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+:where(html[data-workspace="dispatch"]) body .wp-banner p {
+  color: var(--color-text-secondary);
+}
+@media (max-width: 800px) {
+  :where(html[data-workspace="dispatch"]) body .wp-menu.wp-expand {
+    display: none;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-nav-item {
+    height: var(--touch-target);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-search {
+    width: 220px;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-tabbar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 30;
+    display: flex;
+    padding: var(--space-8) var(--space-12) max(var(--space-8), env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-border-default);
+    background: var(--color-bg-surface);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-main {
+    padding-bottom: 96px;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-menu {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-surface);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-topbar {
+    flex-wrap: nowrap;
+    min-height: 0;
+    padding: var(--space-8) var(--space-16) var(--space-4) var(--space-12);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-breadcrumb {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 0;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-breadcrumb > img,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-search,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-topbar .wp-avatar,
+  :where(html[data-workspace="dispatch"])
+    body
+    .wp-shell[data-tabs]
+    .wp-page-header[data-in-shell]
+    > div:first-child {
+    display: none;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-breadcrumb strong {
+    font: 500 22px / 26px var(--font-display);
+    letter-spacing: -0.22px;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-topbar-sub {
+    display: block;
+    color: var(--color-text-tertiary);
+    font-size: var(--text-label);
+    line-height: 18px;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-icon-button {
+    width: 44px;
+    height: 44px;
+    background: var(--color-bg-surface);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-tabs] .wp-page-header[data-in-shell] {
+    align-items: flex-end;
+  }
+}
+@media (min-width: 801px) and (max-width: 1279px) {
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail][data-collapsed] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-sidebar {
+    align-items: center;
+    gap: var(--space-8);
+    padding: var(--space-16) var(--space-12);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-brand-row {
+    padding: 0 0 var(--space-12);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-brand {
+    gap: 0;
+    font-size: 0;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-brand > span {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    font-size: 1rem;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-collapse,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-nav-group > p,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-sidebar-user-text,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-sidebar-user .wp-avatar,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-context,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-breadcrumb > span,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-breadcrumb > img,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-search kbd {
+    display: none;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-sidebar nav,
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-nav-group {
+    gap: var(--space-8);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-nav-item {
+    position: relative;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: var(--radius-pill);
+  }
+  :where(html[data-workspace="dispatch"])
+    body
+    .wp-shell[data-rail]
+    .wp-nav-item
+    > span:not(.wp-mask-icon) {
+    position: absolute;
+    flex: none;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-nav-item small {
+    display: none;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-nav-item small[data-alert] {
+    display: block;
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    width: 6px;
+    height: 6px;
+    padding: 0;
+    overflow: hidden;
+    background: var(--color-data-accent);
+    font-size: 0;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-sidebar-user {
+    padding: 0;
+    background: transparent;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-sidebar-user-more {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-pill);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-sidebar-user-menu {
+    position: fixed;
+    right: auto;
+    bottom: 68px;
+    left: var(--space-12);
+    min-width: 180px;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-topbar {
+    flex-wrap: nowrap;
+    padding: var(--space-12) var(--space-24);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-breadcrumb {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-breadcrumb strong {
+    font: 500 1.125rem / 24px var(--font-display);
+    letter-spacing: -0.18px;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-topbar-sub {
+    display: block;
+    color: var(--color-text-tertiary);
+    font: 500 var(--text-caption) / 15px var(--font-body);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-search {
+    gap: 0;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-search-label {
+    width: 44px;
+    height: 44px;
+    cursor: pointer;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-search input {
+    flex: none;
+    width: 0;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-search:focus-within {
+    width: 280px;
+    padding-right: 14px;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-search:focus-within input {
+    flex: 1;
+    width: auto;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-icon-button {
+    width: 44px;
+    height: 44px;
+    background: var(--color-bg-surface);
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-main {
+    padding: var(--space-4) var(--space-24) var(--space-24);
+  }
+  :where(html[data-workspace="dispatch"])
+    body
+    .wp-shell[data-rail]
+    .wp-page-header[data-in-shell]
+    > div:first-child {
+    display: none;
+  }
+  :where(html[data-workspace="dispatch"]) body .wp-shell[data-rail] .wp-page-header[data-in-shell] {
+    justify-content: flex-end;
+  }
+}
+@media (max-width: 540px) {
+  :where(html[data-workspace="dispatch"]) body .wp-search {
+    width: 160px;
+  }
+}

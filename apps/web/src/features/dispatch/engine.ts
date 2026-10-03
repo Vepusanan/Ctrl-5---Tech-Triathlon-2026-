@@ -1,6 +1,5 @@
 import {
   PlanningInputError,
-  scoreOrder,
   type TripDraft,
   type ValidatorInput,
   validatePlan,
@@ -12,10 +11,10 @@ import {
   type PlanInput,
   type PlanningQueueItem,
   type ServiceAllowance,
+  type TripDetail,
   type VehicleAvailabilityStatus,
   type VehicleLite,
   type VehicleReference,
-  type Violation,
 } from '@waypoint/shared';
 
 export type TripSlot = { vehicleId: string; tripNo: 1 | 2; orderIds: string[] };
@@ -118,40 +117,23 @@ export function inspectDraft(input: ValidatorInput, drafts: TripDraft[]) {
   }
 }
 
-export function recommendation(
-  item: PlanningQueueItem,
-  outlet: Outlet | undefined,
-  slots: TripSlot[],
-  validator: ValidatorInput,
-) {
-  if (!outlet) return null;
-  const score = scoreOrder(orderLite(item), outlet, defaultPriorityWeights);
-  const feasible = slots
-    .map((slot) => {
-      const next = placeOrder(slots, item.id, slot);
-      const check = inspectDraft(validator, draftsOf(next));
-      return { slot, check };
-    })
-    .filter((option) => option.check.inputError === null && option.check.violations.length === 0);
-  const best = feasible[0];
-  return { score, feasible: best ? best.slot : null, checked: feasible.length };
-}
-
-export function panelItems(violations: Violation[]) {
-  return violations.map((item, index) => ({
-    id: `${item.rule}:${item.orderId ?? 'plan'}:${item.tripKey ?? ''}:${item.vehicleId ?? ''}:${index}`,
-    title: item.rule.replaceAll('_', ' '),
-    description: [
-      item.detail,
-      item.orderId ? `Order ${item.orderId}` : null,
-      item.vehicleId ? `Vehicle ${item.vehicleId}` : null,
-      item.tripKey ? `Trip ${item.tripKey}` : null,
-      item.actual !== undefined && item.limit !== undefined
-        ? `Actual ${item.actual} · limit ${item.limit}`
-        : null,
-    ]
-      .filter((part) => part !== null)
-      .join(' · '),
-    severity: 'danger' as const,
-  }));
+/** The saved plan as slots: two empty trips per available vehicle, filled from recorded trips. */
+export function slotsFromTrips(
+  trips: readonly TripDetail[],
+  vehicles: readonly { id: string; availability: { status: string } | null }[],
+): TripSlot[] {
+  const slots = new Map<string, TripSlot>();
+  for (const vehicle of vehicles) {
+    if (vehicle.availability && vehicle.availability.status !== 'available') continue;
+    slots.set(`${vehicle.id}:1`, { vehicleId: vehicle.id, tripNo: 1, orderIds: [] });
+    slots.set(`${vehicle.id}:2`, { vehicleId: vehicle.id, tripNo: 2, orderIds: [] });
+  }
+  for (const trip of trips) {
+    const key = `${trip.vehicleId}:${trip.tripNo}`;
+    const orderIds = [...trip.stops]
+      .sort((left, right) => left.seq - right.seq)
+      .map((stop) => stop.orderId);
+    slots.set(key, { vehicleId: trip.vehicleId, tripNo: trip.tripNo, orderIds });
+  }
+  return [...slots.values()];
 }

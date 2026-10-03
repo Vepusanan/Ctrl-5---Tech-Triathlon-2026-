@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Button } from '../ui/button';
-import { EmptyState, ErrorState, LoadingState } from './cards';
+import { EmptyState, ErrorState } from './cards';
+import { LoadingLabel, SkeletonTableRows } from './skeleton';
 export interface Column<T> {
   id: string;
   header: string;
@@ -53,9 +54,8 @@ export function DataTable<T>({
   emptyMessage?: string;
 }) {
   const [sort, setSort] = useState<{ id: string; direction: 'ascending' | 'descending' }>();
-  if (loading) return <LoadingState label={`Loading ${caption.toLowerCase()}…`} />;
   if (error) return <ErrorState description={error} onRetry={onRetry} />;
-  if (!rows.length) return <EmptyState title={emptyMessage} />;
+  if (!rows.length && !loading) return <EmptyState title={emptyMessage} />;
   const col = columns.find((c) => c.id === sort?.id);
   const sorted = col?.sortValue
     ? [...rows].sort((a, b) => {
@@ -73,7 +73,8 @@ export function DataTable<T>({
   const some = rows.some((row) => selected.has(rowKey(row)));
   return (
     <div className="wp-card wp-table-card">
-      {onSelectionChange && (
+      {loading && <LoadingLabel label={`Loading ${caption.toLowerCase()}…`} />}
+      {onSelectionChange && !loading && (
         <div className="wp-between wp-table-toolbar">
           <span role="status">
             {rows.filter((row) => selected.has(rowKey(row))).length} selected
@@ -93,7 +94,7 @@ export function DataTable<T>({
           <caption>{caption}</caption>
           <thead>
             <tr>
-              {onSelectionChange && (
+              {onSelectionChange && !loading && (
                 <th scope="col">
                   <Selection
                     label="Select all rows"
@@ -153,32 +154,34 @@ export function DataTable<T>({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row) => {
-              const key = rowKey(row);
-              return (
-                <tr key={key} data-selected={selected.has(key)}>
-                  {onSelectionChange && (
-                    <td>
-                      <Selection
-                        label={`Select ${key}`}
-                        checked={selected.has(key)}
-                        onChange={() => {
-                          const next = new Set(selected);
-                          if (next.has(key)) next.delete(key);
-                          else next.add(key);
-                          onSelectionChange([...next]);
-                        }}
-                      />
-                    </td>
-                  )}
-                  {columns.map((column) => (
-                    <td key={column.id} className={column.numeric ? 'wp-numeric' : ''}>
-                      {column.cell(row)}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
+            {loading && <SkeletonTableRows columns={columns} />}
+            {!loading &&
+              sorted.map((row) => {
+                const key = rowKey(row);
+                return (
+                  <tr key={key} data-selected={selected.has(key)}>
+                    {onSelectionChange && (
+                      <td>
+                        <Selection
+                          label={`Select ${key}`}
+                          checked={selected.has(key)}
+                          onChange={() => {
+                            const next = new Set(selected);
+                            if (next.has(key)) next.delete(key);
+                            else next.add(key);
+                            onSelectionChange([...next]);
+                          }}
+                        />
+                      </td>
+                    )}
+                    {columns.map((column) => (
+                      <td key={column.id} className={column.numeric ? 'wp-numeric' : ''}>
+                        {column.cell(row)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </section>

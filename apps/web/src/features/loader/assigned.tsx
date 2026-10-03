@@ -1,18 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { loadingStateSchema, type TripDetail } from '@waypoint/shared';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  Button,
-  EmptyState,
-  ErrorState,
-  LoadingState,
-  StatusBadge,
-  Tag,
-} from '../../components/waypoint';
+import { Button, StatusBadge, Tag } from '../../components/waypoint';
 import { api, HttpError, message } from '../../lib/api';
 import { time } from '../store/shared';
 import { firstArrival, loadingBadge, tripName, unitsOf } from './labels';
-import { DarkTile, LoaderIcon, PageHead, Seq } from './shell';
+import { DarkTile, LoaderIcon, PageHead, RefreshButton, Seq, StateCard } from './shell';
+import { AssignedSkeleton } from './skeletons';
 import { byRun, loaderKey, TO_LOAD, useLoader, useLoaderTrips } from './workspace';
 
 const RECENT_DEPARTURES = 6;
@@ -23,6 +18,12 @@ export function AssignedLoads() {
   const navigate = useNavigate();
   const client = useQueryClient();
   const trips = useLoaderTrips();
+  // A press on Refresh shows as busy; the 30 s background poll does not.
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = () => {
+    setRefreshing(true);
+    void trips.refetch().finally(() => setRefreshing(false));
+  };
   // Starting records this loader against the vehicle, with the version the loader saw.
   const start = useMutation({
     mutationFn: async (trip: TripDetail) => {
@@ -36,11 +37,9 @@ export function AssignedLoads() {
     onSettled: () => client.invalidateQueries({ queryKey: loaderKey(user.id) }),
   });
 
-  if (trips.isPending) return <LoadingState label="Loading assigned trips…" />;
-  if (!trips.data) {
-    return <ErrorState description={message(trips.error)} onRetry={() => void trips.refetch()} />;
-  }
-  const published = trips.data.items.filter((trip) => trip.run.status === 'published');
+  const loading = trips.isPending;
+  const failed = !loading && !trips.data;
+  const published = (trips.data?.items ?? []).filter((trip) => trip.run.status === 'published');
   const toLoad = published.filter((trip) => TO_LOAD.includes(trip.status)).sort(byRun);
   const departed = published
     .filter((trip) => trip.status === 'departed' || trip.status === 'completed')
@@ -49,12 +48,24 @@ export function AssignedLoads() {
     .slice(0, RECENT_DEPARTURES);
   const [next, ...queue] = toLoad;
   const first = next ? firstArrival(next.stops) : null;
+  const updated = trips.dataUpdatedAt
+    ? ` · last updated ${time(new Date(trips.dataUpdatedAt).toISOString())}`
+    : '';
+  // The footnote names the state the list is in, as each Figma state frame does (G02–G05).
+  const detail = loading
+    ? 'refreshing…'
+    : trips.isError
+      ? `couldn’t refresh${updated}`
+      : !next
+        ? 'nothing waiting'
+        : `${toLoad.length} ${toLoad.length === 1 ? 'load' : 'loads'} · load last stop first`;
 
   return (
     <>
       <PageHead
         title="Assigned loads"
-        detail={`${user.depotId} · ${toLoad.length} ${toLoad.length === 1 ? 'load' : 'loads'} · load last stop first`}
+        detail={`${user.depotId} · ${detail}`}
+        status={<RefreshButton busy={loading || refreshing} onClick={refresh} />}
       />
       {start.error && (
         <div className="loader-banner loader-banner--danger" role="alert">
@@ -66,11 +77,34 @@ export function AssignedLoads() {
           </p>
         </div>
       )}
-      {!next ? (
-        <EmptyState
-          title="No loads waiting"
-          description="Trips appear here once the dispatcher publishes the plan."
-        />
+      {loading ? (
+        <AssignedSkeleton />
+      ) : failed ? (
+        <StateCard
+          tone="danger"
+          icon={<LoaderIcon name="wifi-off-danger" size={30} />}
+          title="Couldn’t load your assigned loads"
+          description={message(trips.error)}
+        >
+          <Button
+            variant="secondary"
+            className="loader-cta"
+            busy={trips.isFetching}
+            onClick={refresh}
+          >
+            Retry
+          </Button>
+        </StateCard>
+      ) : !next ? (
+        <StateCard
+          icon={<LoaderIcon name="truck-empty" size={30} />}
+          title="No loads currently awaiting action"
+          description={`New loads appear here when the dispatcher publishes a plan for ${user.depotId}.`}
+        >
+          <Button variant="secondary" className="loader-cta" busy={refreshing} onClick={refresh}>
+            Refresh
+          </Button>
+        </StateCard>
       ) : (
         <div className="loader-split">
           <NextLoad
@@ -84,7 +118,7 @@ export function AssignedLoads() {
               title="First stop at"
               icon={<LoaderIcon name="clock-inverse" size={16} />}
               value={time(first)}
-              detail={next ? tripName(next) : undefined}
+              detail={tripName(next)}
             />
             {[...queue, ...departed].map((trip) => (
               <QueueCard key={trip.id} trip={trip} />

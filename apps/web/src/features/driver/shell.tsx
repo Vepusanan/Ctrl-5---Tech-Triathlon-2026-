@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { time } from '../store/shared';
 
@@ -53,6 +53,63 @@ export function DriverIcon({ name, size }: { name: DriverIconName; size: number 
   );
 }
 
+export type GlyphName =
+  | 'arrow'
+  | 'bell'
+  | 'boxc'
+  | 'check'
+  | 'cloud'
+  | 'cr'
+  | 'eye'
+  | 'info'
+  | 'logout'
+  | 'pen'
+  | 'phone'
+  | 'pin'
+  | 'refresh'
+  | 'route'
+  | 'shield'
+  | 'slash'
+  | 'user'
+  | 'wifi'
+  | 'x'
+  | 'xoct';
+
+/** A Figma icon from public/waypoint/icons, drawn in the current text colour. */
+export function Glyph({ name, size = 16 }: { name: GlyphName; size?: number }) {
+  return (
+    <span
+      className="driver-glyph"
+      aria-hidden="true"
+      style={
+        {
+          '--driver-glyph': `url("/waypoint/icons/${name}.svg")`,
+          width: size,
+          height: size,
+        } as CSSProperties
+      }
+    />
+  );
+}
+
+/** Figma "Status" chip in the tones the driver screens use, with a tinted icon. */
+export function Chip({
+  tone,
+  icon,
+  children,
+}: {
+  tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+  icon: GlyphName;
+  children: ReactNode;
+}) {
+  return (
+    <span className={`driver-chip driver-chip--${tone}`}>
+      <Glyph name={icon} size={12} />
+      {children}
+    </span>
+  );
+}
+
 /** The Figma nav bar: optional round back button, a footnote above the title, one trailing slot. */
 export function DriverHeader({
   back,
@@ -77,7 +134,7 @@ export function DriverHeader({
         </Link>
       )}
       <div className="driver-nav-text">
-        <p className="driver-footnote">{eyebrow}</p>
+        {eyebrow !== null && <p className="driver-footnote">{eyebrow}</p>}
         <h1 tabIndex={-1} className={large ? 'driver-large-title' : 'driver-title'}>
           {title}
         </h1>
@@ -95,26 +152,32 @@ export function ThumbZone({ children }: { children: ReactNode }) {
 const pendingLabel = (pending: number) =>
   pending === 0 ? 'nothing waiting' : `${pending} waiting to sync`;
 
-/** The last sync as the driver reads it; `at` is an operating-clock timestamp. */
-export const syncTime = (at: string | null) =>
-  at === null ? 'not synced yet on this phone' : `last sync ${time(at)}`;
-
-/** Offline bar from the shell components: connectivity, pending count and the last sync. */
+/**
+ * Offline bar from the shell components (`2035:565`): the saved route version, the last sync and
+ * the pending count. Tapping it opens the Sync center.
+ */
 export function OfflineBar({
   pending,
   lastSyncAt,
+  routeVersion,
 }: {
   pending: number;
   lastSyncAt: string | null;
+  routeVersion: number | null;
 }) {
   return (
-    <div className="driver-offline" role="status">
+    <Link className="driver-offline" to="/driver/sync" role="status">
       <DriverIcon name="wifi-off" size={20} />
-      <div>
-        <p>Offline · {pendingLabel(pending)}</p>
-        <small>Stops are saved on this phone · {syncTime(lastSyncAt)}</small>
-      </div>
-    </div>
+      <span className="driver-offline-text">
+        <strong>
+          Offline · {routeVersion === null ? 'saved on this phone' : `saved route v${routeVersion}`}
+        </strong>
+        <small>
+          {lastSyncAt === null ? 'Not synced yet on this phone' : `Last sync ${time(lastSyncAt)}`}
+        </small>
+      </span>
+      <span className="driver-offline-count">{pending} pending</span>
+    </Link>
   );
 }
 

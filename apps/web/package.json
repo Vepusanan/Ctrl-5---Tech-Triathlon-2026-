@@ -21,7 +21,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.4",
-    "signature_pad": "^5.1.4"
+    "signature_pad": "^5.1.4",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
