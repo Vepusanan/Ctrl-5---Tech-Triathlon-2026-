@@ -31,23 +31,29 @@ describe('demo day', () => {
     expect(store?.outletId).toMatch(/^OUT\d{3}$/);
   });
 
-  it('gives the store manager dry and chilled Fresh orders and leaves some editable', () => {
+  it('gives the store manager an editable order before cutoff, drafts, and a free chilled slot', () => {
     const store = day.accounts.find((account) => account.role === 'store_manager');
     const storeOrders = day.orders.filter((order) => order.outletId === store?.outletId);
-    expect(
-      storeOrders.some((order) => order.temp === 'ambient' && order.status === 'confirmed'),
-    ).toBe(true);
-    expect(
-      storeOrders.some((order) => order.temp === 'chilled' && order.status === 'confirmed'),
-    ).toBe(true);
-    const drafts = day.orders.filter((order) => order.status === 'draft');
-    expect(drafts.length).toBeGreaterThanOrEqual(3);
+    const thisRun = storeOrders.filter((order) => order.requestedDate === DEMO_SERVICE_DATE);
+    // Still open at the 15:50 demo start; the 4 PM cutoff confirms it into this run.
+    expect(thisRun).toEqual([
+      expect.objectContaining({ temp: 'ambient', status: 'submitted', lockedAt: null }),
+    ]);
+    // The walkthrough places the store's Fresh chilled order for this run.
+    expect(thisRun.some((order) => order.temp === 'chilled')).toBe(false);
+    const drafts = storeOrders.filter((order) => order.status === 'draft');
+    expect(drafts.map((order) => order.temp).sort()).toEqual(['ambient', 'chilled']);
+    expect(drafts.every((order) => order.requestedDate > DEMO_SERVICE_DATE)).toBe(true);
     expect(drafts.every((order) => order.submittedAt === null && order.lockedAt === null)).toBe(
       true,
     );
-    expect(
-      day.orders.some((order) => order.status === 'submitted' && order.lockedAt === null),
-    ).toBe(true);
+  });
+
+  it('never places two active orders in one outlet, date and temperature slot', () => {
+    const slots = day.orders
+      .filter((order) => order.status !== 'cancelled')
+      .map((order) => `${order.outletId}|${order.requestedDate}|${order.temp}`);
+    expect(new Set(slots).size).toBe(slots.length);
   });
 
   it('includes a van-only stop, a Style mall order, workshop vehicles, and a prior deferral', () => {

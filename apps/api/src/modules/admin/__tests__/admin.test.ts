@@ -14,7 +14,7 @@ import {
   orderListResponseSchema,
   orderSchema,
 } from '@waypoint/shared';
-import { and, desc, eq, lt, ne } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   client,
@@ -154,19 +154,7 @@ describe('demo admin', () => {
     );
     const order = listed.items.find((item) => item.lockedAt === null);
     if (order === undefined) throw new Error('Expected an editable submitted order');
-    // The demo day can place more than one order in the same slot. Leave this one alone
-    // so the cutoff check is the only thing that can reject an edit.
-    await app.db
-      .update(orders)
-      .set({ status: 'cancelled' })
-      .where(
-        and(
-          eq(orders.outletId, order.outletId),
-          eq(orders.requestedDate, order.requestedDate),
-          eq(orders.temp, order.temp),
-          ne(orders.id, order.id),
-        ),
-      );
+    // The seed keeps one active order per slot, so only the cutoff can reject this edit.
 
     const previous = await previousOperatingDate(app, order.requestedDate);
     const beforeCutoff = `${previous}T15:30:00.000+05:30`;
