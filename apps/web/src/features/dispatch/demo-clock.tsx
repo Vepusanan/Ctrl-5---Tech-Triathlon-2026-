@@ -1,12 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { operatingClockSchema } from '@waypoint/shared';
+import { operatingClockSchema, seedResetResponseSchema } from '@waypoint/shared';
+import { useState } from 'react';
 import { Button } from '../../components/waypoint';
 import { api, message } from '../../lib/api';
+import { replaceSession } from '../../lib/session';
 import { clockLabel } from '../store/shared';
 
 // DEMO_MODE only (GET/PUT /admin/clock). Jumps the operating clock to the walkthrough's
 // moments around the selected run: before and after the 4 PM cutoff that closes it, and the
-// service-day morning when Fresh trips leave (03:30, SYSTEM_DESIGN §7.3).
+// service-day morning when Fresh trips leave (03:30, SYSTEM_DESIGN §7.3). Reset restores the
+// deterministic seed (POST /admin/reset) and ends every session, so it asks twice.
 export function DemoClock({
   now,
   date,
@@ -29,6 +32,16 @@ export function DemoClock({
       : []),
     { label: 'Service morning', at: `${date}T03:30:00.000+05:30` },
   ];
+  const [confirming, setConfirming] = useState(false);
+  const reset = useMutation({
+    mutationFn: () =>
+      api('/admin/reset', seedResetResponseSchema, {
+        method: 'POST',
+        body: JSON.stringify({ confirm: true }),
+      }),
+    // The API clears the session cookie as part of the reset; sign in again on the fresh seed.
+    onSuccess: () => replaceSession(client, null),
+  });
   const move = useMutation({
     mutationFn: (at: string) =>
       api('/admin/clock', operatingClockSchema, {
@@ -57,6 +70,29 @@ export function DemoClock({
         </Button>
       ))}
       {move.error && <p role="alert">{message(move.error)}</p>}
+      {confirming ? (
+        <div className="dispatch-demo-reset">
+          <p>
+            Reset all demo data? Orders, plans, loads and deliveries return to the seed and everyone
+            is signed out.
+          </p>
+          <Button busy={reset.isPending} onClick={() => reset.mutate()}>
+            Reset demo
+          </Button>
+          <Button
+            variant="tertiary"
+            disabled={reset.isPending}
+            onClick={() => setConfirming(false)}
+          >
+            Cancel
+          </Button>
+        </div>
+      ) : (
+        <Button variant="tertiary" onClick={() => setConfirming(true)}>
+          Reset demo data
+        </Button>
+      )}
+      {reset.error && <p role="alert">{message(reset.error)}</p>}
     </section>
   );
 }

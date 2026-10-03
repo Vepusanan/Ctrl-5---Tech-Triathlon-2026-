@@ -176,3 +176,17 @@
 .dispatch-notice-text small {
   color: var(--color-text-secondary);
 }
+
+/* Two-step confirmation for the demo seed reset. */
+.dispatch-demo-reset {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-8);
+  border-radius: var(--radius-field);
+  background: var(--color-status-danger-subtle);
+}
+
+.dispatch-demo-reset p {
+  color: var(--color-status-danger);
+  font-size: var(--text-small);
+}
