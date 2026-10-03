@@ -2,26 +2,22 @@ import type { Outlet, StopStatus, TripStatus } from '@waypoint/shared';
 import type { Status } from '../../components/waypoint';
 import type { DriverIconName } from './shell';
 
-// Picked from a list, never typed while driving (SYSTEM_DESIGN §10.3). The API stores the
-// chosen text as the failure reason, and the store and dispatcher read it as written.
+// Picked from a list, never typed while driving (SYSTEM_DESIGN §10.3). These are the five chips
+// of DR04a (`2046:5578`); the API stores the chosen text as the failure reason, and the store and
+// dispatcher read it as written.
 export const FAILURE_REASONS = [
-  'Customer unavailable',
   'Outlet closed',
-  'Damaged goods',
-  'Shortage / missing items',
-  'Wrong or incomplete address',
-  'Vehicle / access issue',
+  'No access',
+  'Refused',
+  'Damaged',
   'Other',
 ] as const;
 
-// Figma chip icons for each reason the API already accepts.
 export const reasonIcon: Record<(typeof FAILURE_REASONS)[number], DriverIconName> = {
-  'Customer unavailable': 'user',
   'Outlet closed': 'lock-inverse',
-  'Damaged goods': 'xoct',
-  'Shortage / missing items': 'minus',
-  'Wrong or incomplete address': 'nav',
-  'Vehicle / access issue': 'slash',
+  'No access': 'slash',
+  Refused: 'x',
+  Damaged: 'xoct',
   Other: 'more',
 };
 
@@ -37,6 +33,12 @@ export const stopTitle = (outletId: string, outlet: Outlet | undefined) =>
 
 export const windowRange = (outlet: Outlet | undefined) =>
   outlet ? `${outlet.window.open}–${outlet.window.close}` : null;
+
+/** Figma counts goods in cartons; the API field is `units`. */
+export const cartons = (count: number) => `${count} ${count === 1 ? 'carton' : 'cartons'}`;
+
+/** The id a driver can read out: Figma shows "ev-51a09". */
+export const eventRef = (clientEventId: string) => `ev-${clientEventId.slice(0, 5)}`;
 
 export const percent = (part: number, whole: number) =>
   whole === 0 ? 0 : Math.round((part / whole) * 100);
@@ -58,8 +60,8 @@ export const tripBadge: Record<TripStatus, { status: Status; label: string }> = 
   planned: { status: 'planning', label: 'Planned' },
   published: { status: 'allocated', label: 'Waiting to load' },
   loading: { status: 'loading', label: 'Loading' },
-  ready: { status: 'ready', label: 'Ready to start' },
-  departed: { status: 'departed', label: 'On the road' },
+  ready: { status: 'ready', label: 'Ready' },
+  departed: { status: 'in-progress', label: 'In progress' },
   completed: { status: 'completed', label: 'Completed' },
   blocked: { status: 'blocked', label: 'Blocked' },
 };

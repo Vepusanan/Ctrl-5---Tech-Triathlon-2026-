@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { StatusBadge } from '../../components/waypoint';
+import { Skeleton, StatusBadge } from '../../components/waypoint';
 import { initials } from '../store/shared';
 
 // Tablet shell from Figma section B (L01–L07, 1180 × 820): a 68 px app bar, a page heading,
@@ -17,9 +17,12 @@ type LoaderIconName =
   | 'info'
   | 'minus'
   | 'plus'
+  | 'refresh'
   | 'truck'
+  | 'truck-empty'
   | 'truck-large'
-  | 'user';
+  | 'user'
+  | 'wifi-off-danger';
 
 export function LoaderIcon({ name, size }: { name: LoaderIconName; size: number }) {
   return (
@@ -59,6 +62,7 @@ export function TabletAppBar({
   title,
   subtitle,
   planVersion,
+  planPending = false,
   online,
   name,
   notices,
@@ -66,6 +70,8 @@ export function TabletAppBar({
   title: string;
   subtitle: string;
   planVersion: number | null;
+  /** The trips are still loading: the pill keeps its place so the bar does not move. */
+  planPending?: boolean;
   online: boolean;
   name: string;
   notices: number;
@@ -88,11 +94,18 @@ export function TabletAppBar({
         <LoaderIcon name="bell-button" size={44} />
         {notices > 0 && <span className="loader-bell-count">{notices}</span>}
       </span>
-      {planVersion !== null && (
+      {planVersion !== null ? (
         <span className="loader-pill">
           <LoaderIcon name="file" size={14} />
           Plan v{planVersion}
         </span>
+      ) : (
+        planPending && (
+          <span className="loader-pill" aria-hidden="true">
+            <LoaderIcon name="file" size={14} />
+            <Skeleton width={40} height={12} on="subtle" />
+          </span>
+        )
       )}
       <StatusBadge status={online ? 'online' : 'offline'} />
       <div className="loader-user">
@@ -137,6 +150,44 @@ export function PageHead({
       </div>
       {status}
     </div>
+  );
+}
+
+/** Round "Refresh" pill at the right of the L01 heading (Figma G02–G05). */
+export function RefreshButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className="loader-refresh" disabled={busy} onClick={onClick}>
+      <LoaderIcon name="refresh" size={16} />
+      {busy ? 'Refreshing…' : 'Refresh'}
+    </button>
+  );
+}
+
+/** The one card of an empty (G04) or failed (G05) screen: icon well, what happened, one action. */
+export function StateCard({
+  tone = 'neutral',
+  icon,
+  title,
+  description,
+  children,
+}: {
+  tone?: 'neutral' | 'danger';
+  icon: ReactNode;
+  title: string;
+  description: string;
+  children?: ReactNode;
+}) {
+  return (
+    <section className="loader-card loader-state">
+      <span className={`loader-state-well${tone === 'danger' ? ' loader-state-well--danger' : ''}`}>
+        {icon}
+      </span>
+      <div role={tone === 'danger' ? 'alert' : undefined}>
+        <h2>{title}</h2>
+        <p>{description}</p>
+      </div>
+      {children}
+    </section>
   );
 }
 

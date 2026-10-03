@@ -14,9 +14,16 @@
   --color-border-default: #ebebe8;
   --color-border-strong: #d6d6d1;
   --color-border-focus: #111;
+  --color-action-selected: #ededea;
   --color-data-accent: #ff4a26;
+  --color-data-accent-soft: #ffe7e0;
+  --color-data-cat-1: #ff4a26;
+  --color-data-cat-2: #111;
+  --color-data-cat-3: #ffc93c;
+  --color-data-cat-4: #c9c6bf;
   --color-data-pos: #3ed598;
   --color-data-pos-ink: #06301f;
+  --color-data-neg-soft: #ffe5e5;
   --color-data-track: #f1f1ef;
   --color-data-track-invert: #2a2a2a;
   --color-status-success: #0f7a4b;
@@ -56,6 +63,7 @@
   --radius-pill: 999px;
   --font-body: "Inter Variable", Inter, sans-serif;
   --font-display: "Geist Variable", Geist, sans-serif;
+  --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
   --text-caption: 0.6875rem;
   --text-small: 0.75rem;
   --text-label: 0.8125rem;

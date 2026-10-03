@@ -376,7 +376,7 @@
   white-space: nowrap;
 }
 
-.loader-cta.wp-button--primary:disabled {
+.loader-cta.wp-button--primary:disabled:not([aria-busy="true"]) {
   background: var(--color-bg-muted);
   color: var(--color-text-tertiary);
 }
@@ -1582,6 +1582,76 @@
 }
 
 /* Portrait tablets: one column, side tiles become a row. */
+/* Loading, empty and error states (Figma G02, G04, G05). */
+.loader-refresh {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-8);
+  padding: 10px var(--space-16);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.loader-refresh:disabled {
+  opacity: 0.5;
+}
+
+.loader-skeleton .loader-card {
+  gap: var(--space-16);
+}
+
+.loader-skeleton .loader-card .wp-skeleton {
+  border-radius: 12px;
+}
+
+.loader-state {
+  flex: 1 0 auto;
+  align-content: center;
+  justify-items: center;
+  gap: 14px;
+  min-height: 420px;
+  padding: var(--space-40);
+  text-align: center;
+}
+
+.loader-state-well {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-subtle);
+}
+
+.loader-state-well--danger {
+  background: var(--color-status-danger-subtle);
+}
+
+.loader-state h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: -0.18px;
+}
+
+.loader-state p {
+  margin: 14px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
 @media (max-width: 960px) {
   .loader-split,
   .loader-split--verify,

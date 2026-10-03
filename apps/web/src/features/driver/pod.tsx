@@ -2,6 +2,7 @@ import { type DeliveryStop, deliveryStopSchema, podSchema } from '@waypoint/shar
 import { useRef, useState } from 'react';
 import { Button } from '../../components/waypoint';
 import { api, HttpError } from '../../lib/api';
+import { cartons } from './labels';
 import { DriverIcon, ThumbZone } from './shell';
 import { SignatureField, type SignatureHandle } from './signature';
 
@@ -42,15 +43,18 @@ export interface PodDraft {
 // The form is display: contents so its thumb zone sits at the foot of the screen.
 export function DeliveryForm({
   stop,
+  recipient: expected,
   busy,
   onSubmit,
 }: {
   stop: DeliveryStop;
+  /** The outlet's usual receiver, pre-filled so the driver only corrects it (DR04 note). */
+  recipient: string;
   busy: boolean;
   onSubmit: (pod: PodDraft) => void;
 }) {
   const signature = useRef<SignatureHandle>(null);
-  const [recipient, setRecipient] = useState('');
+  const [recipient, setRecipient] = useState(expected);
   const [unsigned, setUnsigned] = useState(true);
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [photoNote, setPhotoNote] = useState('');
@@ -129,18 +133,30 @@ export function DeliveryForm({
           {photoNote}
         </p>
       )}
-      <section className="driver-card driver-count" aria-label="Units">
-        <div>
-          <span>Units handed over</span>
+      <section className="driver-card driver-count" aria-label="Cartons">
+        <div className="driver-row-text">
+          <span>Cartons handed over</span>
           <strong>
             {stop.order.units} of {stop.order.units} planned
           </strong>
+        </div>
+        {/* DR04 `2046:5521`. The API records a delivery as complete, so the count is fixed. */}
+        <div className="driver-stepper" title="A short delivery cannot be recorded yet">
+          <button type="button" disabled aria-label="One carton less">
+            <DriverIcon name="minus" size={18} />
+          </button>
+          <output aria-label={`${cartons(stop.order.units)} handed over`}>
+            {stop.order.units}
+          </output>
+          <button type="button" disabled aria-label="One carton more">
+            <DriverIcon name="plus" size={18} />
+          </button>
         </div>
       </section>
       {ready ? (
         <p className="driver-note">
           <DriverIcon name="check" size={16} />
-          Proof complete
+          Proof complete · saves on this phone
         </p>
       ) : (
         !busy && (

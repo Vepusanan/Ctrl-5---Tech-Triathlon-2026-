@@ -1,6 +1,7 @@
 import { type ReactNode, useId } from 'react';
 import { Button } from '../ui/button';
 import { Badge, FigmaIcon, Tag, type Tone } from './badges';
+import { LoadingLabel, SkeletonCard } from './skeleton';
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <article className={`wp-card ${className}`}>{children}</article>;
 }
@@ -63,26 +64,33 @@ export function MetricCard({
   value,
   delta,
   trend = 'success',
+  badge,
   icon,
+  iconTone,
   children,
 }: {
   label: string;
   value: ReactNode;
   delta?: string;
   trend?: 'success' | 'danger' | 'neutral';
+  /** Replaces the `delta` badge, for example a `DeltaBadge` or a `Tag`. */
+  badge?: ReactNode;
   icon?: ReactNode;
+  iconTone?: Tone | undefined;
   children?: ReactNode;
 }) {
   return (
     <Card className="wp-metric">
       <div className="wp-between">
         <strong className="wp-number">{value}</strong>
-        {delta && <Badge tone={trend}>{delta}</Badge>}
+        {badge ?? (delta && <Badge tone={trend}>{delta}</Badge>)}
       </div>
       {children}
       <div className="wp-between">
         <p className="wp-muted">{label}</p>
-        {icon && <span className="wp-icon-well">{icon}</span>}
+        {icon && (
+          <span className={`wp-icon-well ${iconTone ? `tone-${iconTone}` : ''}`}>{icon}</span>
+        )}
       </div>
     </Card>
   );
@@ -378,6 +386,7 @@ export function ErrorState({
     </Card>
   );
 }
+/** The Figma X03 loading card. Pages with a known layout use their own skeleton instead. */
 export function LoadingState({
   label = 'Loading data…',
   rows = 3,
@@ -386,13 +395,13 @@ export function LoadingState({
   rows?: number;
 }) {
   return (
-    <Card className="wp-loading">
-      <p role="status">{label}</p>
-      <div aria-hidden="true">
-        {Array.from({ length: Math.min(10, Math.max(1, rows)) }, (_, i) => (
-          <div className="wp-skeleton" key={`skeleton-${i.toString()}`} />
-        ))}
-      </div>
-    </Card>
+    <>
+      <LoadingLabel label={label} />
+      <SkeletonCard
+        className={rows >= 3 ? 'wp-loading' : ''}
+        block={rows >= 3}
+        lines={Math.min(2, Math.max(1, rows))}
+      />
+    </>
   );
 }

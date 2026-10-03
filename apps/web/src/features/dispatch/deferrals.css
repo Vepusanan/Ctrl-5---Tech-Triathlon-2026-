@@ -1,0 +1,361 @@
+/* D06 · Deferral decision center (Figma 2102:6825) and D06a · Confirm deferrals (2040:3005) */
+.df-top {
+  display: grid;
+  grid-template-columns: 371px repeat(3, minmax(0, 1fr));
+  gap: var(--space-16);
+}
+.df-top .wp-metric {
+  min-height: 168px;
+}
+.df-short {
+  gap: 10px;
+  min-height: 168px;
+}
+.df-short h2 {
+  color: var(--color-text-inverse-muted);
+  font: 500 var(--text-label) / 18px var(--font-body);
+  letter-spacing: 0;
+}
+.df-well {
+  width: 32px;
+  height: 32px;
+}
+.df-short-value {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-8);
+  color: var(--color-text-inverse-muted);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+.df-short-value strong {
+  color: var(--color-text-inverse);
+  font: 600 var(--text-display) / 42px var(--font-display);
+  letter-spacing: -0.8px;
+}
+.df-short-bar {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 190px);
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-inverse-muted);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.df-short-bar--have .wp-progress-fill {
+  background: var(--color-text-inverse);
+}
+.df-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 757fr) minmax(0, 371fr);
+  gap: var(--space-16);
+}
+.df-table {
+  gap: var(--space-12);
+}
+.df-hint {
+  margin-right: auto;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+.df-table .d-head {
+  justify-content: flex-start;
+}
+.df-table .d-head-actions {
+  flex: 1;
+}
+.df-rows td {
+  height: 58px;
+}
+.df-rows tr[data-focus] td:first-child {
+  box-shadow: inset 2px 0 0 var(--color-text-primary);
+}
+.df-col-check {
+  width: 38px;
+}
+.df-col-order {
+  width: 132px;
+}
+.df-col-why {
+  width: 188px;
+}
+.df-col-past {
+  width: 90px;
+}
+.df-col-since {
+  width: 74px;
+}
+.df-col-rank {
+  width: 92px;
+}
+.df-open {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.df-open strong {
+  display: block;
+  font-weight: 500;
+}
+.df-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  white-space: normal;
+}
+.df-reason {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 3px var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font: 500 var(--text-caption) / 15px var(--font-body);
+  white-space: nowrap;
+}
+.df-reason[data-severity="blocking"] {
+  background: var(--color-status-danger-subtle);
+  color: var(--color-status-danger);
+}
+.df-reason[data-severity="pressure"] {
+  background: var(--color-status-warning-subtle);
+  color: var(--color-status-warning);
+}
+.df-days {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.df-days strong {
+  color: var(--color-text-primary);
+  font: 600 var(--text-title) / 26px var(--font-display);
+  letter-spacing: -0.24px;
+}
+.df-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.df-rank b {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font: 600 var(--text-caption) / 14px var(--font-body);
+}
+.df-rank b[data-defer] {
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+}
+.df-rank .wp-progress {
+  width: 48px;
+}
+.df-advice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font: 600 var(--text-caption) / 14px var(--font-body);
+}
+.df-advice[data-advice="defer"] {
+  background: var(--color-intel-recommend-subtle);
+  color: var(--color-intel-recommend);
+}
+.df-weights {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  margin-top: auto;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.df-weights .wp-chip {
+  font-weight: 400;
+}
+.df-decision {
+  gap: 14px;
+}
+.df-subject {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.df-subject > div {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.df-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: 14px;
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-subtle);
+}
+.df-facts ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.df-facts li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--color-text-secondary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.df-fact-ok {
+  color: var(--color-status-success);
+}
+.df-fact-hard {
+  color: var(--color-status-danger);
+}
+.df-fact-warn {
+  color: var(--color-status-warning);
+}
+.df-reason-field > span {
+  color: var(--color-text-secondary);
+  font: 500 var(--text-small) / 17px var(--font-body);
+}
+.df-reason-field select {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-field);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font: 400 var(--text-body) / 21px var(--font-body);
+}
+.df-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: 10px var(--space-12);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-field);
+  color: var(--color-text-secondary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.df-notice p {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.df-notice p > span:not(.wp-mask-icon) {
+  flex: 1;
+}
+.df-preview {
+  color: var(--color-text-primary);
+}
+.df-notice blockquote {
+  margin: 0;
+  color: var(--color-text-primary);
+}
+.df-final {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-20);
+}
+.df-final .wp-field {
+  flex: 1;
+  min-width: 260px;
+}
+.df-final-side {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.df-final-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.df-final-chips .wp-chip {
+  font-weight: 400;
+}
+.df-lock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.df-modal-summary {
+  margin-top: -10px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.df-modal-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--space-16);
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-subtle);
+}
+.df-modal-row[data-repeat] {
+  background: var(--color-status-warning-subtle);
+}
+.df-modal-row > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+.df-modal-row p {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.df-modal-row p strong {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+.df-modal-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-nested);
+  color: var(--color-text-secondary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+@media (max-width: 1100px) {
+  .df-top {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .df-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

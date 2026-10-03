@@ -10,21 +10,33 @@ import {
   tripDetailSchema,
 } from '@waypoint/shared';
 import { useState } from 'react';
-import { Link, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import {
-  Button,
-  ErrorState,
-  LoadingState as Loading,
-  StatusBadge,
-  Tag,
-} from '../../components/waypoint';
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
+import { Button, StatusBadge, Tag } from '../../components/waypoint';
 import { api, HttpError, message } from '../../lib/api';
 import { orderName, time } from '../store/shared';
 import { firstArrival, loadingBadge, tripName, unitsOf } from './labels';
-import { ActionBar, LoaderIcon, PageHead, ProgressRing, Seq, SharedIcon, Stepper } from './shell';
+import {
+  ActionBar,
+  LoaderIcon,
+  PageHead,
+  ProgressRing,
+  Seq,
+  SharedIcon,
+  StateCard,
+  Stepper,
+} from './shell';
 import { ShortfallForm } from './shortfall';
+import { LoadPlanSkeleton } from './skeletons';
 import { Deciding, Handover, PlanChanged } from './states';
-import { loaderKey, useLoader } from './workspace';
+import { loaderKey, useLoader, useLoaderTrips } from './workspace';
 
 /** Everything one trip's screens share: the API state, the loader's counts and the actions. */
 export interface LoadFlow {
@@ -45,6 +57,8 @@ export interface LoadFlow {
   allLoaded: boolean;
   open: number;
   busy: boolean;
+  /** The last action was refused or did not reach the server; the next tap is a retry. */
+  failed: boolean;
   online: boolean;
   start: () => void;
   /** Records verification (and acceptance of a changed plan) against the current trip version. */
@@ -59,6 +73,7 @@ export interface LoadFlow {
 export function LoadDetail() {
   const { tripId = '' } = useParams();
   const { user } = useLoader();
+  const trips = useLoaderTrips();
   const key = [...loaderKey(user.id), 'trip', tripId] as const;
   const trip = useQuery({
     queryKey: [...key, 'detail'],
@@ -76,16 +91,39 @@ export function LoadDetail() {
     staleTime: 5 * 60_000,
   });
 
-  if (trip.isPending || loading.isPending) return <Loading label="Loading the load plan…" />;
+  // The trip list is already loaded for the app bar, so the heading can be real while we wait.
+  const listed = trips.data?.items.find((item) => item.id === tripId);
+  if (trip.isPending || loading.isPending) {
+    return <LoadPlanSkeleton {...(listed ? { title: tripName(listed) } : {})} />;
+  }
   if (!trip.data || !loading.data) {
     return (
-      <ErrorState
-        description={message(trip.error ?? loading.error)}
-        onRetry={() => {
-          void trip.refetch();
-          void loading.refetch();
-        }}
-      />
+      <>
+        <PageHead
+          back="/loader"
+          backLabel="Assigned loads"
+          title={listed ? tripName(listed) : 'Load plan'}
+          detail="couldn’t refresh"
+        />
+        <StateCard
+          tone="danger"
+          icon={<LoaderIcon name="wifi-off-danger" size={30} />}
+          title="Couldn’t load this load plan"
+          description={message(trip.error ?? loading.error)}
+        >
+          <Button
+            variant="secondary"
+            className="loader-cta"
+            busy={trip.isFetching || loading.isFetching}
+            onClick={() => {
+              void trip.refetch();
+              void loading.refetch();
+            }}
+          >
+            Retry
+          </Button>
+        </StateCard>
+      </>
     );
   }
   // Counts are cleared when the trip version changes, as the plan they were made against is gone.
@@ -110,6 +148,8 @@ function Flow({
 }) {
   const { user, online } = useLoader();
   const client = useQueryClient();
+  // Figma G15: a failed send on the shortfall form keeps the entries and offers Retry.
+  const sending = useLocation().pathname.endsWith('/shortfall');
   const [counts, setCounts] = useState<ReadonlyMap<string, number>>(new Map());
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: loaderKey(user.id) });
@@ -159,6 +199,7 @@ function Flow({
     allLoaded: reversed.every(complete),
     open: state.issues.filter((issue) => issue.acknowledgedAt === null).length,
     busy: action.isPending,
+    failed: action.isError,
     online,
     start: () => post(`/trips/${tripId}/loading/start`),
     verify: (onDone) => post(`/trips/${tripId}/loading/verify`, onDone),
@@ -191,8 +232,11 @@ function Flow({
       )}
       {action.error && (
         <div className="loader-banner loader-banner--danger" role="alert">
-          <strong>Not saved</strong>
-          <p>{message(action.error)}</p>
+          <strong>{sending ? 'Couldn’t send the shortfall' : 'Not saved'}</strong>
+          <p>
+            {message(action.error)}
+            {sending ? ' Your entries are kept — tap Retry.' : ''}
+          </p>
         </div>
       )}
       {detail.status === 'blocked' && (

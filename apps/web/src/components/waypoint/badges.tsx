@@ -81,13 +81,15 @@ export function Badge({
   tone = 'neutral',
   children,
   icon,
+  className = '',
 }: {
   tone?: Tone;
   children: ReactNode;
   icon?: ReactNode;
+  className?: string;
 }) {
   return (
-    <span className={`wp-badge tone-${tone}`}>
+    <span className={`wp-badge tone-${tone} ${className}`}>
       {icon}
       {children}
     </span>
@@ -96,7 +98,7 @@ export function Badge({
 export function StatusBadge({ status, label }: { status: Status; label?: string | undefined }) {
   const [text, tone, icon] = statusMap[status];
   return (
-    <Badge tone={tone} icon={<FigmaIcon name={icon} />}>
+    <Badge tone={tone} icon={<FigmaIcon name={icon} />} className="wp-status">
       {label ?? text}
     </Badge>
   );
@@ -104,7 +106,11 @@ export function StatusBadge({ status, label }: { status: Status; label?: string 
 export function Tag({ kind, children }: { kind: TagKind; children?: ReactNode }) {
   const [text, tone, icon] = tagMap[kind];
   return (
-    <Badge tone={tone} icon={icon ? <FigmaIcon name={icon} /> : <span aria-hidden="true">●</span>}>
+    <Badge
+      tone={tone}
+      icon={icon ? <FigmaIcon name={icon} /> : <span aria-hidden="true">●</span>}
+      className="wp-tag"
+    >
       {children ?? text}
     </Badge>
   );

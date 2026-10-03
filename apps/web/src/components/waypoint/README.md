@@ -24,7 +24,10 @@ Import components and types from `components/waypoint`. `styles/globals.css` loa
 | SyncBadge | `state`: pending/syncing/synced/conflict; optional `pendingCount` |
 | EmptyState | optional title, description and action slot |
 | ErrorState | title, description, optional retry callback and retrying flag |
-| LoadingState | accessible label, optional skeleton row count |
+| LoadingState | accessible label, optional skeleton row count; the generic Figma X03 loading card, for screens with no known layout yet |
+| Skeleton | one placeholder block: `shape` (line, title, number, block, field, button, circle), `width`, `height`, `on` (surface, subtle, inverse) |
+| SkeletonLines, SkeletonRows, SkeletonCard, SkeletonMetric, SkeletonTableRows | ready-made groups; pages combine them inside their own layout classes so nothing moves when data arrives |
+| LoadingLabel | the screen-reader text (`role="status"`) that goes with a skeleton; takes no space |
 | DeadlineCard | title, remaining display string, progress 0–100, optional deadline and upcoming/urgent/overdue/complete state |
 
 Use `Button` for 44px action targets. Badges are noninteractive labels. Supply meaningful labels for icon-only actions. `DataTable` sorting is local to the supplied rows, not server-side pagination. The caller supplies a stable unique `rowKey`. Deadline strings/progress are supplied by the caller; this component does not calculate dates or run a timer.

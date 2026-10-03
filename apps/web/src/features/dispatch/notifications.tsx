@@ -8,7 +8,7 @@ import {
   notificationListResponseSchema,
 } from '@waypoint/shared';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button } from '../../components/waypoint';
+import { Badge, Button, LoadingLabel, SkeletonRows } from '../../components/waypoint';
 import { api, HttpError, message } from '../../lib/api';
 import { day, time } from '../store/shared';
 import { dispatchNotificationsKey } from './stream';
@@ -114,11 +114,18 @@ export function DispatchNotifications({
       </div>
       {feed.feed.error && <p role="alert">{message(feed.feed.error)}</p>}
       {acknowledge.error && <p role="alert">{message(acknowledge.error)}</p>}
-      {items.length === 0 ? (
-        <p className="wp-muted">
-          Loading shortfalls, failed deliveries, receipt discrepancies and sync conflicts appear
-          here.
-        </p>
+      {feed.feed.isPending ? (
+        <>
+          <LoadingLabel label="Loading notifications…" />
+          <SkeletonRows rows={3} />
+        </>
+      ) : items.length === 0 ? (
+        feed.feed.data && (
+          <p className="wp-muted">
+            Loading shortfalls, failed deliveries, receipt discrepancies and sync conflicts appear
+            here.
+          </p>
+        )
       ) : (
         <ul className="dispatch-notices-list">
           {items.map((item) => (

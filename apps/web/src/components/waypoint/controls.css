@@ -1,0 +1,345 @@
+/* Controls · components/waypoint/controls.tsx */
+.wp-mono {
+  font: 400 var(--text-small) / 16px var(--font-mono);
+}
+.wp-icon-action {
+  color: var(--color-text-secondary);
+}
+.wp-icon-bare {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin: -4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+.wp-icon-action:hover:not(:disabled),
+.wp-icon-action[aria-pressed="true"] {
+  background: var(--color-bg-muted);
+  color: var(--color-text-primary);
+}
+.wp-popover {
+  position: relative;
+}
+.wp-popover-panel {
+  position: absolute;
+  top: calc(100% + var(--space-8));
+  right: 0;
+  z-index: 20;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-float);
+}
+.wp-popover-panel[data-align="start"] {
+  right: auto;
+  left: 0;
+}
+.wp-tabs {
+  display: flex;
+  gap: var(--space-24);
+}
+.wp-tabs button {
+  padding: 0 0 var(--space-8);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font: 500 var(--text-label) / 18px var(--font-body);
+  white-space: nowrap;
+}
+.wp-tabs button[aria-selected="true"] {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-text-primary);
+}
+.wp-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--text-label);
+  line-height: 18px;
+  cursor: pointer;
+}
+.wp-check input {
+  appearance: none;
+  display: grid;
+  place-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+  cursor: pointer;
+}
+.wp-check input:checked,
+.wp-check input:indeterminate {
+  border-color: var(--color-bg-inverse);
+  background: var(--color-bg-inverse);
+}
+.wp-check input:checked::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  background: var(--color-text-inverse);
+  -webkit-mask: url("/waypoint/icons/check.svg") center / contain no-repeat;
+  mask: url("/waypoint/icons/check.svg") center / contain no-repeat;
+}
+.wp-check input:indeterminate::after {
+  content: "";
+  width: 8px;
+  height: 2px;
+  background: var(--color-text-inverse);
+}
+.wp-switch {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+  cursor: pointer;
+  transition: background 120ms;
+}
+.wp-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  transition: transform 120ms;
+}
+.wp-switch:checked {
+  background: var(--color-text-primary);
+}
+.wp-switch:checked::after {
+  transform: translateX(18px);
+}
+.wp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--space-12);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  font: 500 var(--text-small) / 17px var(--font-body);
+  white-space: nowrap;
+}
+.wp-chip[data-dashed] {
+  padding: 5px 11px;
+  border: 1px dashed var(--color-border-strong);
+  background: var(--color-bg-surface);
+}
+button.wp-chip:hover,
+.wp-chip[aria-pressed="true"] {
+  background: var(--color-bg-muted);
+}
+.wp-chip > button {
+  display: grid;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-tertiary);
+}
+.wp-chip-count {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+  font: 600 var(--text-caption) / 14px var(--font-body);
+}
+.wp-chip-count[data-accent] {
+  background: var(--color-data-accent);
+}
+.wp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wp-field label {
+  color: var(--color-text-secondary);
+  font: 500 var(--text-small) / 17px var(--font-body);
+}
+.wp-field input,
+.wp-field textarea {
+  width: 100%;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-field);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font: 400 var(--text-body) / 21px var(--font-body);
+}
+.wp-field input {
+  height: 40px;
+}
+.wp-field textarea {
+  padding-block: 9px;
+  resize: vertical;
+}
+.wp-field input:focus-visible,
+.wp-field textarea:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+/* Locked field: the value stays readable and the lock says who cannot change it. */
+.wp-field-locked {
+  position: relative;
+  display: block;
+  color: var(--color-text-tertiary);
+}
+.wp-field-locked input {
+  padding-right: 36px;
+  border-color: var(--color-border-default);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+}
+.wp-field-locked .wp-mask-icon {
+  position: absolute;
+  top: 13px;
+  right: 14px;
+}
+.wp-field p {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.wp-field[data-invalid] input,
+.wp-field[data-invalid] textarea {
+  border-color: var(--color-status-danger);
+}
+.wp-field[data-invalid] p {
+  color: var(--color-status-danger);
+}
+.wp-sheet {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-float);
+}
+.wp-sheet--drawer {
+  top: var(--space-12);
+  right: var(--space-12);
+  bottom: var(--space-12);
+  width: min(440px, calc(100vw - 24px));
+}
+.wp-sheet--modal {
+  top: 50%;
+  left: 50%;
+  width: min(600px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  transform: translate(-50%, -50%);
+}
+.wp-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wp-sheet-head h2 {
+  flex: 1;
+  font: 500 18px / 24px var(--font-display);
+  letter-spacing: -0.18px;
+}
+.wp-sheet-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  overflow-y: auto;
+}
+.wp-sheet-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+}
+.wp-dots {
+  display: inline-flex;
+  gap: 6px;
+  vertical-align: middle;
+}
+.wp-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-muted);
+}
+.wp-dots i[data-on] {
+  background: var(--color-data-accent);
+}
+/* Row table: sunken header pill, 48px rows, selected row tinted. */
+.wp-rows {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-label);
+  line-height: 18px;
+  text-align: left;
+}
+.wp-rows th {
+  height: 36px;
+  padding: 0 6px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-tertiary);
+  font: 500 var(--text-small) / 17px var(--font-body);
+  white-space: nowrap;
+}
+.wp-rows td {
+  height: 48px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--color-border-default);
+  white-space: nowrap;
+}
+.wp-rows th:first-child,
+.wp-rows td:first-child {
+  padding-left: var(--space-12);
+  border-radius: var(--radius-field) 0 0 var(--radius-field);
+}
+.wp-rows th:last-child,
+.wp-rows td:last-child {
+  padding-right: var(--space-12);
+  border-radius: 0 var(--radius-field) var(--radius-field) 0;
+}
+.wp-rows tr:last-child td,
+.wp-rows tr[data-selected] td {
+  border-bottom-color: transparent;
+}
+.wp-rows tr[data-selected] td {
+  background: var(--color-action-selected);
+}
+.wp-rows .wp-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.wp-rows td small {
+  display: block;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}

@@ -95,6 +95,7 @@ function LoaderAppBar() {
       title={`${user.depotId} depot`}
       subtitle={current ? `${day(current.run.serviceDate)} · loading dock` : 'Loading dock'}
       planVersion={current?.run.planVersion ?? null}
+      planPending={trips.isPending}
       online={online}
       name={user.name}
       notices={(notices.data?.items ?? []).filter((item) => item.actionRequired).length}

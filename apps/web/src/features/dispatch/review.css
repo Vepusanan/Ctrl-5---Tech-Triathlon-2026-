@@ -1,0 +1,226 @@
+/* D08 · Review & publish (Figma 2040:3555) and D08a · Plan published (2040:3969) */
+.rv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 757fr) minmax(0, 371fr);
+  gap: var(--space-16);
+}
+.rv-row--three {
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rv-row--fill {
+  flex: 1;
+}
+.rv-row > .d-dark {
+  min-height: 300px;
+}
+.rv-quality {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-32);
+  min-height: 300px;
+}
+.rv-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+}
+.rv-factors {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rv-factors .d-cap-label {
+  width: 90px;
+}
+.rv-list {
+  gap: var(--space-4);
+}
+.rv-risk {
+  gap: var(--space-12);
+}
+.rv-risk-count {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-8);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+.rv-risk-count strong {
+  color: var(--color-intel-predict);
+  font: 600 32px / 34px var(--font-display);
+  letter-spacing: -0.64px;
+}
+/* One 16px dot per trip, filled column by column. A dashed violet ring is a prediction. */
+.rv-dots {
+  display: grid;
+  grid-template-rows: repeat(4, 16px);
+  grid-auto-flow: column;
+  grid-auto-columns: 16px;
+  gap: 9.6px;
+  overflow: hidden;
+}
+.rv-dots i {
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-muted);
+}
+.rv-dots i[data-risk] {
+  border: 2px dashed var(--color-intel-predict);
+  background: var(--color-intel-predict-subtle);
+}
+.rv-foot {
+  margin-top: auto;
+}
+.rv-confirm {
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+.rv-acks {
+  display: grid;
+  grid-template-columns: minmax(0, 564fr) minmax(0, 306fr) minmax(0, 306fr);
+  gap: var(--space-16);
+}
+.rv-drivers {
+  flex-direction: row;
+  align-items: center;
+  gap: 28px;
+  min-height: 300px;
+}
+.rv-drivers > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.rv-drivers h2 {
+  color: var(--color-text-tertiary);
+  font: 500 var(--text-label) / 18px var(--font-body);
+  letter-spacing: 0;
+}
+.rv-ring-value {
+  font: 600 var(--text-display) / 42px var(--font-display);
+  letter-spacing: -0.8px;
+}
+.rv-ring-label {
+  color: var(--color-text-tertiary);
+  font: 500 var(--text-caption) / 15px var(--font-body);
+}
+.rv-ack {
+  justify-content: space-between;
+  min-height: 300px;
+}
+.rv-ack-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rv-ack-body > p:first-child {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+.rv-ack-body strong {
+  color: var(--color-text-primary);
+  font: 600 32px / 34px var(--font-display);
+  letter-spacing: -0.64px;
+}
+.rv-timeline {
+  gap: var(--space-20);
+}
+.rv-timeline-head {
+  justify-content: flex-start;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+.rv-track {
+  position: relative;
+  height: 120px;
+  margin-right: 36px;
+}
+.rv-track::before {
+  content: "";
+  position: absolute;
+  top: 30px;
+  left: 0;
+  right: -36px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-muted);
+}
+.rv-track li {
+  position: absolute;
+  top: 14px;
+  display: flex;
+  flex-direction: column;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+  white-space: nowrap;
+}
+.rv-node {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 10px;
+  border: 1.5px solid var(--color-text-primary);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+}
+.rv-track strong {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+.rv-versions {
+  gap: var(--space-4);
+}
+.rv-version {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-8) 0;
+}
+.rv-version p {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-text-inverse-muted);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.rv-version strong {
+  color: var(--color-text-inverse);
+  font: 500 var(--text-body) / 21px var(--font-body);
+}
+.rv-compare {
+  color: var(--color-text-inverse-muted);
+}
+.rv-compare:hover:not(:disabled) {
+  color: var(--color-text-inverse);
+}
+@media (max-width: 1100px) {
+  .rv-row,
+  .rv-row--three,
+  .rv-acks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rv-quality,
+  .rv-drivers {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1,0 +1,191 @@
+/* D12 · Vehicle unavailable · replan (Figma 2044:3828) */
+.rp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 757fr) minmax(0, 371fr);
+  gap: var(--space-16);
+  min-height: 340px;
+}
+.rp-row--three {
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-height: 0;
+}
+.rp-flow {
+  gap: 14px;
+}
+.rp-flow-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-20);
+}
+.rp-lost {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  width: 150px;
+  padding: var(--space-16);
+  border-radius: var(--radius-nested);
+  background: var(--color-status-danger-subtle);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.rp-lost strong {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+.rp-lost-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  color: var(--color-status-danger);
+}
+.rp-matrix {
+  display: grid;
+  grid-template-columns: repeat(3, 10px);
+  gap: 6px;
+}
+.rp-matrix i {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-danger);
+}
+.rp-arrow {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+.rp-moves {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rp-moves li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  font-size: var(--text-small);
+  line-height: 17px;
+}
+.rp-moves strong {
+  flex: 1;
+  font-weight: 500;
+  white-space: nowrap;
+}
+/* One colour per destination trip. The trip name sits next to the dots. */
+.rp-dots {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 90px;
+  color: var(--color-data-cat-1);
+}
+.rp-dots[data-cat="2"] {
+  color: var(--color-data-cat-2);
+}
+.rp-dots[data-cat="3"] {
+  color: var(--color-data-cat-3);
+}
+.rp-dots[data-cat="4"] {
+  color: var(--color-data-cat-4);
+}
+.rp-dots i {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.rp-bar {
+  flex-shrink: 0;
+  width: 100px;
+}
+.rp-percent {
+  flex-shrink: 0;
+  min-width: 30px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rp-moves li[data-tone="warning"] .rp-percent {
+  color: var(--color-status-warning);
+}
+.rp-moves li[data-tone="danger"] .rp-percent {
+  color: var(--color-status-danger);
+}
+.rp-note {
+  color: var(--color-text-tertiary);
+  font: 500 var(--text-caption) / 15px var(--font-body);
+}
+.rp-card {
+  gap: 10px;
+}
+.rp-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+.rp-checks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rp-checks .wp-mask-icon {
+  color: var(--color-status-success);
+}
+.rp-checks li[data-state="warn"] .wp-mask-icon {
+  color: var(--color-status-warning);
+}
+.rp-checks li[data-state="fail"] .wp-mask-icon {
+  color: var(--color-status-danger);
+}
+/* Predictions are violet and labelled, so they never read as observed facts. */
+.rp-risk {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+.rp-risk strong {
+  color: var(--color-intel-predict);
+  font: 600 2rem / 34px var(--font-display);
+  letter-spacing: -0.64px;
+  font-variant-numeric: tabular-nums;
+}
+.rp-acks {
+  gap: var(--space-4);
+}
+.rp-confirm {
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+  line-height: 18px;
+}
+@media (max-width: 1100px) {
+  .rp-row,
+  .rp-row--three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rp-flow-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .rp-lost {
+    width: auto;
+  }
+  .rp-arrow {
+    align-self: center;
+    transform: rotate(90deg);
+  }
+}

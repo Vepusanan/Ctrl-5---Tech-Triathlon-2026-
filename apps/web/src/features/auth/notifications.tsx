@@ -5,7 +5,7 @@ import {
   notificationListResponseSchema,
   type User,
 } from '@waypoint/shared';
-import { Button, Card, ErrorState, LoadingState } from '../../components/waypoint';
+import { Button, Card, ErrorState, LoadingLabel, SkeletonCard } from '../../components/waypoint';
 import { api, message } from '../../lib/api';
 
 export function Notifications({ user }: { user: User }) {
@@ -27,7 +27,16 @@ export function Notifications({ user }: { user: User }) {
       await client.invalidateQueries({ queryKey: key });
     },
   });
-  if (feed.isPending) return <LoadingState label="Loading notifications…" />;
+  if (feed.isPending)
+    return (
+      <section>
+        <h1>Notifications</h1>
+        <LoadingLabel label="Loading notifications…" />
+        <SkeletonCard lines={1} />
+        <SkeletonCard lines={1} />
+        <SkeletonCard lines={1} />
+      </section>
+    );
   if (!feed.data)
     return <ErrorState description={message(feed.error)} onRetry={() => void feed.refetch()} />;
   return (
@@ -40,7 +49,11 @@ export function Notifications({ user }: { user: User }) {
           <h2>{item.type.replaceAll('_', ' ')}</h2>
           <p>{new Date(item.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Colombo' })}</p>
           {(!item.readAt || item.actionRequired) && (
-            <Button busy={read.isPending} onClick={() => read.mutate(item)}>
+            <Button
+              busy={read.isPending && read.variables?.id === item.id}
+              disabled={read.isPending}
+              onClick={() => read.mutate(item)}
+            >
               {item.actionRequired ? 'Acknowledge' : 'Mark read'}
             </Button>
           )}

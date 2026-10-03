@@ -1,22 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import type { TripDetail } from '@waypoint/shared';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  Button,
-  EmptyState,
-  ErrorState,
-  LoadingState,
-  StatusBadge,
-} from '../../components/waypoint';
+import { Button, EmptyState, ErrorState, StatusBadge } from '../../components/waypoint';
 import { message } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { day, initials } from '../store/shared';
 import { useDepart } from './actions';
-import { tripBadge } from './labels';
+import { cartons, tripBadge } from './labels';
 import { loadTrips } from './offline/queries';
-import { DriverHeader, DriverIcon, Strip, ThumbZone } from './shell';
-import { DepartError } from './trip';
-import { useDriver } from './workspace';
+import { DriverHeader, DriverIcon, Glyph, Strip, ThumbZone } from './shell';
+import { TripsSkeleton } from './skeletons';
+import { DepartError, useDriverOutlets } from './trip';
+import { tripFinished as finished, useDriver } from './workspace';
 
 // DR01. GET /trips returns every trip on the vehicle, including unpublished planning drafts,
 // so only trips of a published run are shown. The first unfinished trip is the hero card.
@@ -47,7 +42,7 @@ export function MyTrips() {
     return (
       <>
         {header}
-        <LoadingState label="Loading your trips…" />
+        <TripsSkeleton />
       </>
     );
   }
@@ -97,7 +92,8 @@ export function MyTrips() {
                 </strong>
                 <span>
                   {finished(trip) ? 'All stops done' : tripBadge[trip.status].label} ·{' '}
-                  {trip.stops.length} {trip.stops.length === 1 ? 'stop' : 'stops'}
+                  {trip.stops.length} {trip.stops.length === 1 ? 'stop' : 'stops'} ·{' '}
+                  {cartons(trip.stops.reduce((total, stop) => total + stop.order.units, 0))}
                 </span>
               </span>
               <DriverIcon name="chevron-right" size={16} />
@@ -132,17 +128,10 @@ export function MyTrips() {
   );
 }
 
-// The API never marks a trip completed, so a departed trip whose stops all have an outcome is done
-// for the driver and the next trip takes the hero card.
-function finished(trip: TripDetail): boolean {
-  if (trip.status === 'completed') return true;
-  return (
-    trip.status === 'departed' &&
-    trip.stops.every((stop) => stop.status === 'delivered' || stop.status === 'failed')
-  );
-}
-
 function TripHero({ trip, today }: { trip: TripDetail; today: string }) {
+  const { user } = useDriver();
+  const outlets = useDriverOutlets(user.id);
+  const place = new Map((outlets.data?.items ?? []).map((outlet) => [outlet.id, outlet.district]));
   const stops = [...trip.stops].sort((left, right) => left.seq - right.seq);
   const done = stops.filter((stop) => stop.status === 'delivered' || stop.status === 'failed');
   const units = stops.reduce((total, stop) => total + stop.order.units, 0);
@@ -162,7 +151,7 @@ function TripHero({ trip, today }: { trip: TripDetail; today: string }) {
           <dd>{stops.length}</dd>
         </div>
         <div>
-          <dt>units</dt>
+          <dt>{units === 1 ? 'carton' : 'cartons'}</dt>
           <dd>{units}</dd>
         </div>
         <div>
@@ -174,21 +163,20 @@ function TripHero({ trip, today }: { trip: TripDetail; today: string }) {
         {stops.map((stop) => (
           <li key={stop.id}>
             <span className="driver-chip-seq">{stop.seq}</span>
-            {stop.order.outletId}
+            {place.get(stop.order.outletId) ?? stop.order.outletId}
           </li>
         ))}
       </ol>
-      {trip.status === 'ready' && (
-        <Strip tone="success" icon={<DriverIcon name="check" size={16} />}>
-          Loaded and checked. Start when you leave the depot.
-        </Strip>
-      )}
+      {/* Every published trip read online is kept in IndexedDB (offline/queries.ts). */}
+      <Strip tone="success" icon={<Glyph name="cloud" />}>
+        Route v{trip.version} saved for offline
+      </Strip>
       {(trip.status === 'published' || trip.status === 'loading') && (
         <Strip tone="neutral" icon={<DriverIcon name="info" size={16} />}>
           The loader has not finished this vehicle yet.
         </Strip>
       )}
-      {trip.status === 'departed' && (
+      {trip.status === 'departed' && done.length > 0 && (
         <Strip tone="info" icon={<DriverIcon name="info-info" size={16} />}>
           {done.length} of {stops.length} stops done
         </Strip>

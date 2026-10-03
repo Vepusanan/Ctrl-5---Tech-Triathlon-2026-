@@ -1,436 +1,448 @@
 import { useMutation } from '@tanstack/react-query';
-import {
-  type Order,
-  orderSchema,
-  type StoreOrder,
-  type TemperatureRequirement,
-} from '@waypoint/shared';
+import type { Order, TemperatureRequirement } from '@waypoint/shared';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Badge, Button, Card, HeroMetric, StatusBadge, Tag } from '../../components/waypoint';
-import { api, message } from '../../lib/api';
+import { Banner, Button, IconButton, SegmentedControl, Tabs } from '../../components/waypoint';
+import { message } from '../../lib/api';
+import { weekDay } from '../../lib/format';
+import type { Product } from './contracts';
 import {
-  canEdit,
-  cutoffClosed,
-  day,
-  includesSunday,
+  catalogueFor,
+  clearDraft,
+  linesFor,
   orderName,
-  PageHeader,
+  readDraft,
+  rememberLines,
+  saveDraft,
+  storeApi,
+  totals,
+} from './data';
+import { Empty } from './states';
+import {
+  CardHead,
+  canEdit,
+  day,
+  kg,
+  PageHead,
+  Pill,
+  plural,
+  remaining,
+  Stepper,
   StoreIcon,
-  StoreLink,
-  statusForOrder,
+  Strip,
+  TempRow,
+  TempTag,
+  ThumbZone,
+  tempIcon,
   tempName,
   tempsFor,
   time,
-} from './shared';
+  usePhone,
+  Well,
+  weekdayName,
+} from './ui';
 import { useStore } from './workspace';
 
-interface Draft {
-  units: string;
-  weightKg: string;
-  volumeM3: string;
-}
-
-const emptyDraft = (): Draft => ({ units: '', weightKg: '', volumeM3: '' });
-
-function draftFrom(order: Order): Draft {
-  return {
-    units: String(order.units),
-    weightKg: String(order.weightKg),
-    volumeM3: String(order.volumeM3),
-  };
-}
-
-function blank(draft: Draft) {
-  return draft.units === '' && draft.weightKg === '' && draft.volumeM3 === '';
-}
-
-function parsed(draft: Draft) {
-  if (blank(draft)) return { kind: 'empty' as const };
-  const units = Number(draft.units);
-  const weightKg = Number(draft.weightKg);
-  const volumeM3 = Number(draft.volumeM3);
-  if (!Number.isInteger(units) || units < 1)
-    return { kind: 'invalid' as const, error: 'Units must be a whole number greater than zero.' };
-  if (!Number.isFinite(weightKg) || weightKg <= 0)
-    return { kind: 'invalid' as const, error: 'Weight must be greater than zero.' };
-  if (!Number.isFinite(volumeM3) || volumeM3 <= 0)
-    return { kind: 'invalid' as const, error: 'Volume must be greater than zero.' };
-  return { kind: 'ok' as const, value: { units, weightKg, volumeM3 } };
-}
+type Tab = TemperatureRequirement | 'usual';
 
 export function PlaceOrder() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const { data, now, writable, refresh } = useStore();
   const navigate = useNavigate();
+  const phone = usePhone();
   const editing = data.orders.find((item) => item.order.id === id);
   const targetDate =
     editing?.order.requestedDate ?? data.eligibleServiceDate ?? data.nextServiceDate;
+  // The run the store wanted has closed, so a new order goes on the one after (S02a).
   const runClosed =
-    Boolean(data.nextServiceDate) &&
+    !editing &&
+    data.nextServiceDate !== null &&
     data.eligibleServiceDate !== data.nextServiceDate &&
-    cutoffClosed(data.cutoffAt, now) &&
-    !editing;
+    (data.cutoffAt === null || now >= Date.parse(data.cutoffAt));
   const temps = tempsFor(data.outlet.brand);
-  const focus = params.get('temp');
+  const catalogue = useMemo(() => catalogueFor(data.outlet.brand), [data.outlet.brand]);
   const slots = useMemo(
     () =>
       temps.map((temp) => {
-        const existing = data.orders.find(
-          (item) =>
-            item.order.requestedDate === targetDate &&
-            item.order.temp === temp &&
-            item.order.status !== 'cancelled' &&
-            (!editing ||
-              item.order.id === editing.order.id ||
-              item.order.requestedDate === editing.order.requestedDate),
-        );
-        return { temp, existing: existing ?? null };
+        const existing =
+          data.orders.find(
+            (item) =>
+              item.order.requestedDate === targetDate &&
+              item.order.temp === temp &&
+              item.order.status !== 'cancelled',
+          ) ?? null;
+        return { temp, existing, locked: existing ? !canEdit(existing, now) : false };
       }),
-    [data.orders, editing, targetDate, temps],
+    [data.orders, now, targetDate, temps],
   );
-  const [drafts, setDrafts] = useState<Record<string, Draft>>(() =>
-    Object.fromEntries(
-      slots.map((slot) => [
-        slot.temp,
-        slot.existing ? draftFrom(slot.existing.order) : emptyDraft(),
-      ]),
-    ),
+  const [quantities, setQuantities] = useState<Record<string, number>>(() => {
+    const draft = targetDate ? readDraft(data.outlet.id, targetDate) : {};
+    const sent = new Map(
+      slots.flatMap((slot) =>
+        slot.existing
+          ? linesFor(slot.existing.order).map((line) => [line.product.sku, line.qty] as const)
+          : [],
+      ),
+    );
+    return Object.fromEntries(
+      catalogue.map((product) => {
+        const slot = slots.find((item) => item.temp === product.temp);
+        return [
+          product.sku,
+          slot?.existing ? (sent.get(product.sku) ?? 0) : (draft[product.sku] ?? 0),
+        ];
+      }),
+    );
+  });
+  const asked = params.get('temp');
+  const [tab, setTab] = useState<Tab>(
+    temps.find((temp) => temp === asked) ?? editing?.order.temp ?? temps[0] ?? 'ambient',
   );
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  const linesOf = (temp: TemperatureRequirement) =>
+    catalogue
+      .filter((product) => product.temp === temp)
+      .map((product) => ({ product, qty: quantities[product.sku] ?? 0 }));
+  const sums = slots.map((slot) => {
+    const items = linesOf(slot.temp);
+    return { ...slot, items, ...totals(items) };
+  });
+  const total = sums.reduce(
+    (sum, slot) => ({
+      lines: sum.lines + slot.lines,
+      weightKg: sum.weightKg + slot.weightKg,
+      volumeM3: sum.volumeM3 + slot.volumeM3,
+    }),
+    { lines: 0, weightKg: 0, volumeM3: 0 },
+  );
+  const sending = sums.filter((slot) => slot.units > 0 && !slot.locked);
+  // A usual item left at zero is flagged before sending, once that order has any line.
+  const forgotten = catalogue.filter((product) => {
+    const slot = sums.find((item) => item.temp === product.temp);
+    return (
+      product.usual > 0 &&
+      (quantities[product.sku] ?? 0) === 0 &&
+      slot &&
+      slot.units > 0 &&
+      !slot.locked
+    );
+  });
+  const cutoff =
+    slots.find((slot) => slot.existing)?.existing?.cutoffAt ??
+    data.serviceDates.find((item) => item.date === targetDate)?.cutoffAt ??
+    data.cutoffAt;
+
   const save = useMutation({
     mutationFn: async () => {
       if (!targetDate) throw new Error('No operating day is open for a new order.');
       if (!writable) throw new Error('Reconnect before submitting an order.');
-      const created: Order[] = [];
-      for (const slot of slots) {
-        const draft = drafts[slot.temp] ?? emptyDraft();
-        const result = parsed(draft);
-        if (slot.existing && !canEdit(slot.existing, now)) continue;
-        if (result.kind === 'empty') {
-          if (slot.existing)
+      const saved: Order[] = [];
+      for (const slot of sums) {
+        if (slot.locked) continue;
+        const size = { units: slot.units, weightKg: slot.weightKg, volumeM3: slot.volumeM3 };
+        if (slot.units === 0) {
+          if (slot.existing) {
             throw new Error(
-              `The ${tempName(slot.temp).toLowerCase()} order already exists. Keep a size or cancel it.`,
+              `The ${tempName(slot.temp).toLowerCase()} order already exists. Keep at least one line on it.`,
             );
+          }
           continue;
         }
-        if (result.kind === 'invalid') throw new Error(`${tempName(slot.temp)}: ${result.error}`);
-        if (slot.existing) {
-          const current = slot.existing.order;
-          const changed =
-            current.units !== result.value.units ||
-            current.weightKg !== result.value.weightKg ||
-            current.volumeM3 !== result.value.volumeM3;
-          if (!changed) {
-            created.push(current);
-            continue;
-          }
-          created.push(
-            await api(`/orders/${current.id}`, orderSchema, {
-              method: 'PATCH',
-              headers: { 'If-Match': String(current.version) },
-              body: JSON.stringify(result.value),
-            }),
-          );
-        } else {
-          created.push(
-            await api('/orders', orderSchema, {
-              method: 'POST',
-              body: JSON.stringify({ requestedDate: targetDate, temp: slot.temp, ...result.value }),
-            }),
-          );
-        }
+        const current = slot.existing?.order;
+        const order = !current
+          ? await storeApi.createOrder({ requestedDate: targetDate, temp: slot.temp, ...size })
+          : current.units === size.units &&
+              current.weightKg === size.weightKg &&
+              current.volumeM3 === size.volumeM3
+            ? current
+            : await storeApi.updateOrder(current, size);
+        rememberLines(order.id, slot.items);
+        saved.push(order);
       }
-      if (!created.length)
-        throw new Error('Enter units, weight and volume for at least one order.');
-      return created;
+      if (!saved.length) throw new Error('Add at least one line before you submit.');
+      return saved;
     },
     onSuccess: async (orders) => {
+      if (targetDate) clearDraft(data.outlet.id, targetDate);
       await refresh();
       const first = orders[0];
-      if (!first) return;
-      const companion = orders[1];
-      navigate(`/store/orders/${first.id}/confirmation`, {
-        state: companion ? { companionId: companion.id } : null,
-      });
+      if (first) navigate(`/store/orders/${first.id}/${runClosed ? 'held' : 'confirmation'}`);
     },
     onError: (cause) => setError(message(cause)),
   });
+  const submit = () => {
+    setError('');
+    save.mutate();
+  };
 
   if (!targetDate) {
     return (
-      <Card>
-        <h1>No delivery day is open</h1>
-        <p>The calendar has no upcoming operating day for a new order.</p>
-      </Card>
+      <>
+        <PageHead title="Place order" />
+        <Empty
+          icon="cal"
+          title="No delivery day is open"
+          description="The calendar has no upcoming operating day for a new order."
+        />
+      </>
     );
   }
-
   if (editing && !canEdit(editing, now)) {
     return (
       <>
-        <PageHeader
+        <PageHead
           title="This order is locked"
-          description={`${orderName(editing.order.id)} · planning has this run`}
+          sub={`${orderName(editing.order.id)} · planning has this run`}
+          back="/store"
+        />
+        <Empty
+          icon="lock"
+          title={`${orderName(editing.order.id)} can no longer be edited`}
+          description={
+            editing.cutoffAt
+              ? `The cutoff was ${time(editing.cutoffAt)} on ${day(editing.cutoffAt)}.`
+              : 'Planning has locked it.'
+          }
         >
-          <StoreLink secondary to={`/store/orders/${editing.order.id}/confirmation`}>
-            View order
-          </StoreLink>
-        </PageHeader>
-        <LockedNotice item={editing} nextDate={data.eligibleServiceDate} />
+          <Button asChild variant="secondary" size="md">
+            <Link to={`/store/orders/${editing.order.id}`}>View status</Link>
+          </Button>
+        </Empty>
+      </>
+    );
+  }
+
+  const wanted = query.trim().toLowerCase();
+  const shown = catalogue.filter(
+    (product) =>
+      (tab === 'usual' ? product.usual > 0 : product.temp === tab) &&
+      (!wanted || `${product.name} ${product.sku}`.toLowerCase().includes(wanted)),
+  );
+  const isLocked = (product: Product) =>
+    slots.find((slot) => slot.temp === product.temp)?.locked ?? false;
+  const setQty = (sku: string, qty: number) => {
+    setSavedAt(null);
+    setQuantities((current) => ({ ...current, [sku]: qty }));
+  };
+  const tabs = [
+    ...sums.map((slot) => ({
+      value: slot.temp as Tab,
+      label: `${tempName(slot.temp)} · ${slot.lines}`,
+    })),
+    ...(phone ? [] : [{ value: 'usual' as Tab, label: `Usual ${weekdayName(targetDate)}` }]),
+  ];
+  const submitLabel = error
+    ? 'Retry'
+    : editing
+      ? 'Save changes'
+      : sending.length > 1
+        ? 'Submit both orders'
+        : 'Submit order';
+  const cutoffLabel = `Cutoff ${time(cutoff)} · ${remaining(cutoff, now).toLowerCase()}`;
+  const searchField = searching && (
+    <input
+      className="st-search-field"
+      type="search"
+      aria-label="Search the catalogue"
+      placeholder="Search by product or code"
+      value={query}
+      onChange={(event) => setQuery(event.target.value)}
+    />
+  );
+  const searchButton = (
+    <IconButton
+      icon="search"
+      label="Search the catalogue"
+      active={searching}
+      onClick={() => {
+        setSearching((value) => !value);
+        setQuery('');
+      }}
+    />
+  );
+  const failure = error && (
+    <Banner tone="danger" title="Couldn’t submit your order">
+      {error} Your lines are kept.
+    </Banner>
+  );
+  const usualChip = (product: Product) => {
+    const missed = forgotten.includes(product);
+    return (
+      <span className="st-usual" data-missed={missed || undefined}>
+        <StoreIcon name="history" size={12} />
+        usual {product.usual}
+      </span>
+    );
+  };
+
+  if (phone) {
+    return (
+      <>
+        <PageHead
+          title={`Order for ${weekDay(targetDate)}`}
+          eyebrow={runClosed ? `Held for ${day(targetDate)}` : cutoffLabel}
+          phoneAction={searchButton}
+        />
+        {tabs.length > 1 && (
+          <SegmentedControl
+            label="Order"
+            value={tab}
+            options={tabs}
+            onChange={(value) => setTab(value)}
+          />
+        )}
+        {searchField}
+        {failure}
+        <section className="wp-card st-lines-phone">
+          {shown.length === 0 && <p className="st-caption">No product matches that search.</p>}
+          {shown.map((product) => (
+            <div key={product.sku} className="st-line-phone">
+              <div>
+                <strong>{product.name}</strong>
+                {usualChip(product)}
+              </div>
+              <Stepper
+                label={product.name}
+                size={44}
+                value={quantities[product.sku] ?? 0}
+                disabled={isLocked(product)}
+                onChange={(qty) => setQty(product.sku, qty)}
+              />
+            </div>
+          ))}
+        </section>
+        <ThumbZone>
+          <p className="st-thumb-note">
+            <strong>
+              {kg(total.weightKg)} · {plural(total.lines, 'line')}
+            </strong>
+            <small>{sums.map((slot) => tempName(slot.temp).toLowerCase()).join(' + ')}</small>
+          </p>
+          <Button className="st-btn-xl" busy={save.isPending} disabled={!writable} onClick={submit}>
+            {save.isPending ? 'Submitting…' : submitLabel}
+          </Button>
+        </ThumbZone>
       </>
     );
   }
 
   return (
     <>
-      <PageHeader
+      <PageHead
         title={runClosed ? `Order held for ${day(targetDate)}` : `Order for ${day(targetDate)}`}
-        description={
-          data.outlet.brand === 'Fresh'
-            ? 'Chilled and dry are sent as two orders'
-            : `${data.outlet.brand} · ${data.outlet.window.open}–${data.outlet.window.close}`
+        sub={
+          runClosed
+            ? 'The cutoff has passed, so this order goes on the next run'
+            : temps.length > 1
+              ? 'Chilled and dry are sent as two orders'
+              : `${data.outlet.brand} · window ${data.outlet.window.open}–${data.outlet.window.close}`
         }
       >
-        <Badge tone={runClosed ? 'hold' : 'neutral'}>
-          {runClosed
-            ? 'Held · next run'
-            : `Cutoff ${time(data.cutoffAt)} · ${cutoffClosed(data.cutoffAt, now) ? 'locked' : 'open'}`}
-        </Badge>
-      </PageHeader>
-      {runClosed && (
-        <HeldNotice
-          date={targetDate}
-          closedDate={data.nextServiceDate}
-          window={`${data.outlet.window.open}–${data.outlet.window.close}`}
-        />
-      )}
+        {runClosed ? (
+          <Pill tone="hold" icon="pause">
+            Held · next run
+          </Pill>
+        ) : (
+          <span className="st-chip">
+            <StoreIcon name="clock" size={14} />
+            {cutoffLabel}
+          </span>
+        )}
+      </PageHead>
+      {failure}
       <form
-        className="store-split store-order-form"
+        className="st-grid st-grid--hero st-fill"
         onSubmit={(event) => {
           event.preventDefault();
-          setError('');
-          save.mutate();
+          submit();
         }}
       >
-        <Card>
-          <div className="store-stack">
-            {slots.map((slot) => (
-              <SizeFields
-                key={slot.temp}
-                temp={slot.temp}
-                draft={drafts[slot.temp] ?? emptyDraft()}
-                locked={slot.existing ? !canEdit(slot.existing, now) : false}
-                highlighted={focus === slot.temp}
-                onChange={(draft) => setDrafts((current) => ({ ...current, [slot.temp]: draft }))}
-              />
-            ))}
+        <section className="wp-card st-catalogue">
+          <div className="st-catalogue-head">
+            <Tabs label="Order" value={tab} options={tabs} onChange={(value) => setTab(value)} />
+            {searchField}
+            {searchButton}
           </div>
-        </Card>
-        <div className="store-stack store-order-summary">
-          <Card>
-            <h2>Summary</h2>
-            {slots.map((slot) => {
-              const result = parsed(drafts[slot.temp] ?? emptyDraft());
-              const units = result.kind === 'ok' ? result.value.units : slot.existing?.order.units;
-              const weight =
-                result.kind === 'ok' ? result.value.weightKg : slot.existing?.order.weightKg;
-              return (
-                <div className="store-row" key={slot.temp}>
-                  <span>
-                    <StoreIcon source="2047-5268" name={slot.temp === 'chilled' ? 'Snow' : 'Box'} />{' '}
-                    {tempName(slot.temp)}
-                  </span>
-                  <strong>
-                    {units ?? '—'} units · {weight ?? '—'} kg
-                  </strong>
-                </div>
-              );
-            })}
-            <p className="store-figure">
-              {slots
-                .reduce((total, slot) => {
-                  const result = parsed(drafts[slot.temp] ?? emptyDraft());
-                  return total + (result.kind === 'ok' ? result.value.weightKg : 0);
-                }, 0)
-                .toLocaleString()}
-              <small>kg total</small>
-            </p>
-            {error && (
-              <p role="alert" className="store-error">
-                {error}
-              </p>
-            )}
-            <Button type="submit" busy={save.isPending} disabled={!writable}>
-              {save.isPending
-                ? 'Submitting…'
-                : data.outlet.brand === 'Fresh'
-                  ? 'Submit orders'
-                  : 'Submit order'}
-            </Button>
-            <p className="wp-muted">
-              Orders lock at 16:00 Asia/Colombo on the day before delivery.
-            </p>
-          </Card>
-          {!runClosed && (
-            <CutoffCardLite
-              cutoff={
-                slots.find((slot) => slot.existing)?.existing?.cutoffAt ??
-                data.serviceDates.find((item) => item.date === targetDate)?.cutoffAt ??
-                data.cutoffAt
-              }
-              now={now}
-            />
+          {shown.some(isLocked) && (
+            <Pill tone="hold" icon="lock">
+              Locked after cutoff
+            </Pill>
           )}
-        </div>
+          {shown.length === 0 && <p className="st-caption">No product matches that search.</p>}
+          <ul className="st-lines">
+            {shown.map((product) => (
+              <li key={product.sku}>
+                <Well icon={tempIcon(product.temp)} size={48} />
+                <div className="st-line-text">
+                  <strong>{product.name}</strong>
+                  <span>
+                    <code>{product.sku}</code>
+                    <TempTag temp={product.temp} />
+                  </span>
+                </div>
+                {usualChip(product)}
+                <Stepper
+                  label={product.name}
+                  value={quantities[product.sku] ?? 0}
+                  disabled={isLocked(product)}
+                  onChange={(qty) => setQty(product.sku, qty)}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="wp-card st-summary">
+          <CardHead icon="list" title="Summary" />
+          {sums.map((slot) => (
+            <TempRow
+              key={slot.temp}
+              temp={slot.temp}
+              lines={plural(slot.lines, 'line')}
+              value={slot.units > 0 ? kg(slot.weightKg) : 'not sent'}
+            />
+          ))}
+          {forgotten[0] && (
+            <Strip tone="warning" icon="alert">
+              {forgotten[0].name} is at 0 — you usually order {forgotten[0].usual}.
+              {forgotten.length > 1 && ` ${forgotten.length - 1} more usual items are at 0.`}
+            </Strip>
+          )}
+          <span className="st-spacer" />
+          <p className="st-caption">
+            Volume {total.volumeM3.toFixed(2)} m³ · requested {day(targetDate)}
+          </p>
+          <p className="st-figure st-figure--lg">
+            <b>{Number(total.weightKg.toFixed(1)).toLocaleString('en-GB')}</b>
+            <span>kg total</span>
+          </p>
+          <Button type="submit" size="md" busy={save.isPending} disabled={!writable}>
+            {save.isPending ? 'Submitting…' : submitLabel}
+          </Button>
+          {!editing && (
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => {
+                saveDraft(data.outlet.id, targetDate, quantities);
+                setSavedAt(now);
+              }}
+            >
+              {savedAt ? `Draft saved ${time(savedAt)}` : 'Save draft'}
+            </Button>
+          )}
+          <Link
+            className="st-quiet-link"
+            to={editing ? `/store/orders/${editing.order.id}` : '/store'}
+          >
+            Cancel
+          </Link>
+        </section>
       </form>
     </>
-  );
-}
-
-function SizeFields({
-  temp,
-  draft,
-  locked,
-  highlighted,
-  onChange,
-}: {
-  temp: TemperatureRequirement;
-  draft: Draft;
-  locked: boolean;
-  highlighted: boolean;
-  onChange: (draft: Draft) => void;
-}) {
-  const step = (by: number) => {
-    const current = Number(draft.units);
-    const next = (Number.isInteger(current) ? current : 0) + by;
-    onChange({ ...draft, units: String(Math.max(0, next)) });
-  };
-  return (
-    <fieldset className="store-nested" disabled={locked} data-active={highlighted || undefined}>
-      <legend className="store-row">
-        <strong>{tempName(temp)}</strong>
-        <Tag kind={temp === 'chilled' ? 'chilled' : 'ambient'} />
-      </legend>
-      {locked && <Badge tone="hold">Locked after cutoff</Badge>}
-      <div className="store-field">
-        <span>Units</span>
-        <div className="store-stepper">
-          <button
-            type="button"
-            aria-label={`Decrease ${tempName(temp)} units`}
-            onClick={() => step(-1)}
-          >
-            −
-          </button>
-          <input
-            inputMode="numeric"
-            aria-label={`${tempName(temp)} units`}
-            value={draft.units}
-            onChange={(event) => onChange({ ...draft, units: event.target.value })}
-          />
-          <button
-            type="button"
-            aria-label={`Increase ${tempName(temp)} units`}
-            onClick={() => step(1)}
-          >
-            +
-          </button>
-        </div>
-      </div>
-      <label className="store-field">
-        Weight kg
-        <input
-          inputMode="decimal"
-          value={draft.weightKg}
-          onChange={(event) => onChange({ ...draft, weightKg: event.target.value })}
-        />
-      </label>
-      <label className="store-field">
-        Volume m³
-        <input
-          inputMode="decimal"
-          value={draft.volumeM3}
-          onChange={(event) => onChange({ ...draft, volumeM3: event.target.value })}
-        />
-      </label>
-    </fieldset>
-  );
-}
-
-function HeldNotice({
-  date,
-  closedDate,
-  window,
-}: {
-  date: string;
-  closedDate: string | null;
-  window: string;
-}) {
-  return (
-    <div className="store-split">
-      <Card>
-        <div className="wp-between">
-          <h2>What happened</h2>
-          <Badge tone="hold">Held automatically</Badge>
-        </div>
-        <p>
-          Orders after 16:00 go to the next operating day.
-          {closedDate && includesSunday(closedDate, date) ? ' There is no Sunday run.' : ''}
-        </p>
-        <p className="wp-muted">
-          {closedDate ? `${day(closedDate)} is locked.` : 'The closed run is locked.'} This order is
-          for {day(date)}.
-        </p>
-      </Card>
-      <HeroMetric
-        label="Next delivery"
-        value={day(date)}
-        description={`Window ${window}`}
-        icon={<StoreIcon source="2047-5268" name="Box" />}
-      />
-    </div>
-  );
-}
-
-function LockedNotice({ item, nextDate }: { item: StoreOrder; nextDate: string | null }) {
-  return (
-    <div className="store-split">
-      <Card>
-        <StatusBadge status={statusForOrder[item.order.status]} />
-        <p>
-          {orderName(item.order.id)} can no longer be edited.{' '}
-          {item.cutoffAt ? `The cutoff was ${time(item.cutoffAt)}.` : 'Planning has locked it.'}
-        </p>
-        {nextDate && (
-          <StoreLink to="/store/orders/new">Place an order for {day(nextDate)}</StoreLink>
-        )}
-      </Card>
-      <Card>
-        <h2>Locked order</h2>
-        <p>
-          {tempName(item.order.temp)} · {item.order.units} units · {item.order.weightKg} kg
-        </p>
-        <Button asChild variant="secondary">
-          <Link to={`/store/orders/${item.order.id}`}>View status</Link>
-        </Button>
-      </Card>
-    </div>
-  );
-}
-
-function CutoffCardLite({ cutoff, now }: { cutoff: string | null | undefined; now: number }) {
-  return (
-    <HeroMetric
-      label="You can still edit"
-      value={cutoff ? (cutoffClosed(cutoff, now) ? 'Locked' : time(cutoff)) : '—'}
-      description={
-        cutoff && !cutoffClosed(cutoff, now)
-          ? `Until the ${time(cutoff)} cutoff. After that, planning locks it.`
-          : 'This run is locked.'
-      }
-      icon={<StoreIcon source="2047-5268" name="Pen" />}
-    />
   );
 }

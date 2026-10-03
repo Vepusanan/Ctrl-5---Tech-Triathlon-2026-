@@ -1,15 +1,17 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Outlet } from '@waypoint/shared';
 import { Link, useParams } from 'react-router-dom';
-import { Button, ErrorState, LoadingState, StatusBadge, Tag } from '../../components/waypoint';
+import { Button, ErrorState, Tag } from '../../components/waypoint';
 import { HttpError, message } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { issueTypeLabel } from '../loader/labels';
-import { orderName, time } from '../store/shared';
-import { dockLabel, stopBadge } from './labels';
+import { time } from '../store/shared';
+import { outletContact, telHref } from './fixtures';
+import { cartons, dockLabel } from './labels';
 import { loadStop, loadTrip } from './offline/queries';
 import type { OutboxEntry } from './offline/types';
-import { DriverHeader, DriverIcon, InverseCard, ListRow, Strip, ThumbZone } from './shell';
+import { DriverHeader, DriverIcon, Glyph, InverseCard, ListRow, Strip, ThumbZone } from './shell';
+import { StopSkeleton } from './skeletons';
 import { useDriverOutlets } from './trip';
 import { useDriver, useStopSync } from './workspace';
 
@@ -60,7 +62,7 @@ export function StopDetail() {
     networkMode: 'always',
   });
 
-  if (stop.isPending) return <LoadingState label="Loading the stop…" />;
+  if (stop.isPending) return <StopSkeleton back="/driver" backLabel="My trips" />;
   if (!stop.data) {
     const hidden = stop.error instanceof HttpError && stop.error.status === 404;
     return (
@@ -77,7 +79,10 @@ export function StopDetail() {
   }
   const detail = stop.data;
   const outlet = outlets.data?.items.find((item) => item.id === detail.order.outletId);
-  const badge = stopBadge(detail.status, detail.late);
+  const contact = outletContact(detail.order.outletId);
+  const arrival = local.entries.findLast(
+    (entry) => entry.type === 'arrived' && entry.status !== 'conflict',
+  );
   const ordered = [...(trip.data?.stops ?? [])].sort((left, right) => left.seq - right.seq);
   const next = ordered.find(
     (item) => item.id !== detail.id && (item.status === 'pending' || item.status === 'arrived'),
@@ -100,16 +105,26 @@ export function StopDetail() {
         eyebrow={`Stop ${detail.seq}${ordered.length ? ` of ${ordered.length}` : ''} · ${detail.order.outletId}`}
         title={place}
         trailing={
-          <StatusBadge status={badge.status} {...(badge.label ? { label: badge.label } : {})} />
+          <a
+            className="driver-round"
+            href={telHref(contact.phone)}
+            aria-label={`Call ${contact.name}`}
+          >
+            <Glyph name="phone" size={20} />
+          </a>
         }
       />
 
       <InverseCard>
         <div className="driver-window-head">
           <div>
-            <span>{detail.status === 'pending' ? 'ETA' : 'Planned'}</span>
+            <span>{detail.status === 'pending' ? 'ETA' : arrival ? 'Arrived' : 'Planned'}</span>
             <strong className="driver-hero-number">
-              {time(detail.status === 'pending' ? detail.eta : detail.plannedArrival)}
+              {time(
+                detail.status === 'pending'
+                  ? detail.eta
+                  : (arrival?.clientTime ?? detail.plannedArrival),
+              )}
             </strong>
           </div>
           <div>
@@ -146,8 +161,13 @@ export function StopDetail() {
           detail={
             outlet?.mallWindow
               ? `Mall window ${outlet.mallWindow.open}–${outlet.mallWindow.close}`
-              : `${orderName(detail.order.id)} · ${detail.order.weightKg.toFixed(0)} kg · ${detail.order.volumeM3.toFixed(2)} m³`
+              : contact.access
           }
+        />
+        <ListRow
+          icon={<DriverIcon name="user" size={20} />}
+          title={contact.name}
+          detail={contact.role}
         />
       </section>
 
@@ -155,14 +175,13 @@ export function StopDetail() {
         <div className="driver-items-head">
           <strong className="driver-big-number">{detail.order.units}</strong>
           <span className="driver-items-label">
-            {detail.order.units === 1 ? 'unit' : 'units'} to hand over
+            {detail.order.units === 1 ? 'carton' : 'cartons'} to hand over
           </span>
           <Tag kind={detail.order.temp === 'chilled' ? 'chilled' : 'ambient'} />
         </div>
         {shortfalls.map((issue) => (
           <Strip key={issue.id} tone="warning" icon={<DriverIcon name="info-warning" size={16} />}>
-            {issue.qty} {issue.qty === 1 ? 'unit' : 'units'}{' '}
-            {issueTypeLabel[issue.type].toLowerCase()} ·{' '}
+            {cartons(issue.qty)} {issueTypeLabel[issue.type].toLowerCase()} ·{' '}
             {issue.acknowledgedAt ? 'dispatcher informed' : 'waiting for the dispatcher'}
           </Strip>
         ))}
@@ -244,7 +263,7 @@ export function StopDetail() {
   );
 }
 
-export const eventLabel: Record<OutboxEntry['type'], string> = {
+const eventLabel: Record<OutboxEntry['type'], string> = {
   arrived: 'Arrival',
   delivered: 'Delivery',
   failed: 'Failed delivery',
