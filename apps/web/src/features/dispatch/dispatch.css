@@ -190,3 +190,291 @@
   color: var(--color-status-danger);
   font-size: var(--text-small);
 }
+
+/* D01 / P02: primary chart and metrics beside the capacity and action rail. */
+.dispatch-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 2.04fr) minmax(280px, 1fr);
+  gap: var(--space-16);
+}
+.dispatch-dashboard-main,
+.dispatch-dashboard-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  min-width: 0;
+}
+.dispatch-dashboard-side > :last-child {
+  flex: 1;
+}
+.dispatch-orders-chart {
+  min-height: 460px;
+}
+.dispatch-orders-chart > .wp-between {
+  align-items: flex-start;
+}
+.dispatch-orders-chart a {
+  font-size: var(--text-label);
+  text-decoration: none;
+}
+.dispatch-orders-chart a:hover {
+  text-decoration: underline;
+}
+.dispatch-chart {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  gap: var(--space-16);
+  margin: 0;
+  padding: var(--space-32) 0 0;
+  list-style: none;
+  overflow-x: auto;
+}
+.dispatch-chart-column {
+  flex: 1;
+  min-width: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  text-align: center;
+}
+.dispatch-chart-track {
+  display: flex;
+  align-items: flex-end;
+  height: 300px;
+}
+.dispatch-chart-bar {
+  position: relative;
+  width: 100%;
+  min-height: 4px;
+  border-radius: 16px;
+  background: var(--color-data-accent);
+}
+.dispatch-chart-bar > span {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-subtle);
+  font-size: 11px;
+  line-height: 16px;
+}
+.dispatch-chart-label {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.dispatch-chart-empty {
+  margin: auto;
+  padding: var(--space-32) 0;
+}
+.dispatch-dashboard .dispatch-live-summary {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.dispatch-loading-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-24);
+  margin: 0;
+}
+.dispatch-loading-stats div {
+  display: flex;
+  flex-direction: column-reverse;
+}
+.dispatch-loading-stats dt {
+  font-size: var(--text-label);
+  color: var(--color-text-tertiary);
+}
+.dispatch-loading-stats dd {
+  margin: 0;
+  font: 600 28px / 1.2 var(--font-display);
+}
+.dispatch-dashboard .store-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.dispatch-workspace h1 {
+  font-size: 22px;
+  line-height: 28px;
+  letter-spacing: -0.22px;
+}
+.dispatch-workspace h2,
+.dispatch-workspace h3 {
+  font-size: 16px;
+  line-height: 22px;
+}
+.dispatch-workspace .store-page-header {
+  margin-bottom: 0;
+  align-items: center;
+}
+@media (max-width: 1100px) {
+  .dispatch-dashboard {
+    grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
+  }
+  .dispatch-dashboard .wp-card {
+    padding: var(--space-20);
+  }
+}
+@media (max-width: 800px) {
+  .dispatch-dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dispatch-dashboard-side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dispatch-workspace .store-page-header {
+    align-items: stretch;
+  }
+  .dispatch-orders-chart {
+    min-height: 340px;
+  }
+  .dispatch-chart-track {
+    height: 220px;
+  }
+}
+@media (max-width: 540px) {
+  .dispatch-dashboard-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dispatch-dashboard .store-metrics {
+    gap: var(--space-8);
+  }
+  .dispatch-dashboard .store-metrics .wp-card {
+    padding: var(--space-12);
+    min-height: 120px;
+  }
+  .dispatch-chart {
+    gap: var(--space-8);
+  }
+  .dispatch-loading-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* D02: one surface for the filters and queue, with compact summary cards. */
+.dispatch-queue-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-16);
+}
+.dispatch-queue-metrics .wp-metric {
+  min-height: 120px;
+}
+.dispatch-queue-table > .wp-table-card {
+  box-shadow: none;
+  border-radius: 0;
+}
+.dispatch-queue-table .wp-table th {
+  background: var(--color-bg-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+.dispatch-queue-table .wp-table th:first-child {
+  border-radius: var(--radius-field) 0 0 var(--radius-field);
+}
+.dispatch-queue-table .wp-table th:last-child {
+  border-radius: 0 var(--radius-field) var(--radius-field) 0;
+}
+.dispatch-queue-table .wp-table caption {
+  padding-left: 0;
+}
+.dispatch-queue-table .dispatch-filters {
+  padding-bottom: var(--space-12);
+  border-bottom: 1px solid var(--color-border-default);
+}
+.dispatch-queue-table .dispatch-check {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* D03: queue, vertically stacked fleet, and the selected order's advisor. */
+.dispatch-board {
+  grid-template-columns: minmax(200px, 0.7fr) minmax(0, 1.5fr);
+  align-items: stretch;
+}
+.dispatch-board[data-advisor] {
+  grid-template-columns: minmax(200px, 0.7fr) minmax(0, 1.5fr) minmax(280px, 1fr);
+}
+.dispatch-columns {
+  flex-direction: column;
+  overflow-x: visible;
+}
+.dispatch-board > .dispatch-queue,
+.dispatch-board > .dispatch-columns {
+  padding: var(--space-16);
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-card);
+  min-width: 0;
+  min-height: 560px;
+}
+
+.dispatch-column,
+.dispatch-order {
+  min-width: 0;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-nested);
+  box-shadow: none;
+}
+.dispatch-order {
+  display: grid;
+  gap: var(--space-8);
+}
+.dispatch-order header,
+.dispatch-column header {
+  flex-wrap: wrap;
+}
+.dispatch-order label {
+  display: grid;
+  gap: var(--space-4);
+  font-size: var(--text-small);
+}
+.dispatch-order select {
+  width: 100%;
+  min-width: 0;
+}
+.dispatch-order p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-small);
+}
+.dispatch-recommendation {
+  padding: 0;
+  background: var(--color-bg-surface);
+}
+.dispatch-recommendation > .wp-card {
+  height: 100%;
+}
+@media (max-width: 1200px) {
+  .dispatch-board[data-advisor] {
+    grid-template-columns: minmax(200px, 0.7fr) minmax(0, 1.5fr);
+  }
+  .dispatch-board > .dispatch-recommendation {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 800px) {
+  .dispatch-queue-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dispatch-board,
+  .dispatch-board[data-advisor] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dispatch-board > .dispatch-queue,
+  .dispatch-board > .dispatch-columns {
+    min-height: 0;
+  }
+  .dispatch-filters > label:not(.dispatch-check) {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+}
+
+.dispatch-dashboard .wp-inverse .wp-track-fill {
+  background: var(--color-text-inverse);
+}

@@ -122,7 +122,7 @@ export function StoreDashboard({ search }: { search: string }) {
           <StoreLink to={placeHref}>Place that order</StoreLink>
         </div>
       )}
-      <div className="store-metrics">
+      <div className="store-metrics store-home-metrics">
         <MetricCard
           label="Awaiting your receipt confirmation"
           value={pending.length}

@@ -4,17 +4,18 @@ import {
   dashboardExceptionsSchema,
   dashboardSummarySchema,
   loadingIssueSchema,
+  planningQueueResponseSchema,
 } from '@waypoint/shared';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ActionList,
+  Button,
   CapacityBar,
   Card,
   ErrorState,
   HeroMetric,
   LoadingState,
   MetricCard,
-  Tag,
 } from '../../components/waypoint';
 import { api, message } from '../../lib/api';
 import { Page, useDispatch } from './workspace';
@@ -31,7 +32,13 @@ const links: Record<DashboardException['type'], string> = {
 };
 
 export function CommandCenter() {
-  const { date, pollMs } = useDispatch();
+  const { date, pollMs, user } = useDispatch();
+  const queue = useQuery({
+    queryKey: ['planning', user.depotId ?? '', date, 'queue'],
+    queryFn: () => api(`/planning/runs/${date}/queue`, planningQueueResponseSchema),
+    enabled: Boolean(user.depotId),
+    refetchInterval: pollMs,
+  });
   const navigate = useNavigate();
   const summary = useQuery({
     queryKey: ['dashboard', date, 'summary'],
@@ -69,25 +76,122 @@ export function CommandCenter() {
   }
   const data = summary.data;
   const attention = exceptions.data.items.filter((item) => item.severity === 'high');
+  const waiting = queue.data?.items.filter((item) => item.status === 'confirmed') ?? [];
+  const districts = [...new Set(waiting.map((item) => item.outlet.district))]
+    .map((district) => ({
+      district,
+      count: waiting.filter((item) => item.outlet.district === district).length,
+    }))
+    .sort((a, b) => b.count - a.count);
+  const largest = Math.max(1, ...districts.map((item) => item.count));
   return (
     <Page
       title="Operations command center"
-      description={`Service date ${date}. Counts come from the live plan. Alerts refresh from the dashboard stream, with polling if it drops.`}
+      description={`Planning ${date} · ${user.depotId ?? 'All depots'}`}
+      actions={
+        <Button asChild>
+          <Link to={`/dispatcher/queue?date=${date}`}>Open planning queue</Link>
+        </Button>
+      }
     >
-      <div className="store-split">
-        <div className="store-metrics">
-          <MetricCard label="Confirmed orders" value={data.orders.confirmed} />
-          <MetricCard label="Allocated" value={data.orders.allocated} />
-          <MetricCard label="Deferred" value={data.orders.deferred} />
-          <MetricCard label="Active trips" value={data.activeTrips} />
-          <MetricCard label="Delivered stops" value={data.stops.delivered} />
-          <MetricCard label="Failed stops" value={data.stops.failed} />
+      <div className="dispatch-dashboard">
+        <div className="dispatch-dashboard-main">
+          <Card className="dispatch-orders-chart">
+            <div className="wp-between">
+              <div>
+                <p className="wp-muted">Orders awaiting planning · by district</p>
+                <strong className="wp-display">{data.orders.confirmed}</strong>
+              </div>
+              <Link to={`/dispatcher/queue?date=${date}`}>
+                Open queue <span aria-hidden="true">›</span>
+              </Link>
+            </div>
+            {queue.isLoading && <LoadingState label="Loading districts…" />}
+            {queue.isError && (
+              <ErrorState description={message(queue.error)} onRetry={() => void queue.refetch()} />
+            )}
+            {queue.data &&
+              (districts.length ? (
+                <ul className="dispatch-chart" aria-label="Orders awaiting planning by district">
+                  {districts.map(({ district, count }) => (
+                    <li className="dispatch-chart-column" key={district}>
+                      <div className="dispatch-chart-track">
+                        <div
+                          className="dispatch-chart-bar"
+                          style={{ height: `${(count / largest) * 100}%` }}
+                        >
+                          <span>{count}</span>
+                        </div>
+                      </div>
+                      <span className="dispatch-chart-label">{district}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="dispatch-chart-empty wp-muted">No orders waiting for planning.</p>
+              ))}
+          </Card>
+          <div className="store-metrics">
+            <MetricCard
+              label="Chilled awaiting"
+              value={queue.data ? waiting.filter((item) => item.temp === 'chilled').length : '—'}
+            />
+            <MetricCard label="Allocated" value={data.orders.allocated} />
+            <MetricCard label="Repeat-deferral risk" value={data.repeatDeferrals} />
+          </div>
+          <Card className="dispatch-live-summary">
+            <div>
+              <strong>
+                {data.stops.delivered} delivered stops · {data.activeTrips} active trips
+              </strong>
+              <p className="wp-muted">
+                {data.stops.failed} failed stops · {data.orders.deferred} deferred orders
+              </p>
+            </div>
+            <Button asChild variant="secondary">
+              <Link to={`/dispatcher/live?date=${date}`}>Live operations</Link>
+            </Button>
+          </Card>
         </div>
-        <HeroMetric
-          label="Reefer utilisation"
-          value={`${Math.round(data.utilization.reefer * 100)}%`}
-          description={`${attention.length} high-severity alerts · ${data.repeatDeferrals} repeat deferrals`}
-        />
+        <div className="dispatch-dashboard-side">
+          <HeroMetric
+            label="Reefer capacity"
+            value={`${Math.round(data.utilization.reefer * 100)}%`}
+            description={`${attention.length} high-severity alerts · ${data.repeatDeferrals} repeat deferrals`}
+          >
+            <div className="wp-track" aria-hidden="true">
+              <span
+                className="wp-track-fill"
+                style={{ width: `${Math.min(100, data.utilization.reefer * 100)}%` }}
+              />
+            </div>
+          </HeroMetric>
+          <ActionList
+            title="Needs action"
+            items={exceptions.data.items.map((item) => {
+              const shortfall = item.type === 'loading_shortfall';
+              return {
+                id: `${item.type}:${item.entityId}`,
+                title: item.title,
+                // A loader cannot mark the load ready until the shortfall is acknowledged here.
+                description: shortfall ? `${item.reason} · select to acknowledge` : item.reason,
+                tone:
+                  item.severity === 'high'
+                    ? 'danger'
+                    : item.severity === 'medium'
+                      ? 'warning'
+                      : 'neutral',
+                disabled: shortfall && acknowledge.isPending,
+                onClick: shortfall
+                  ? () => acknowledge.mutate(item.entityId)
+                  : () => navigate(`${links[item.type]}?date=${date}`),
+              };
+            })}
+            footer={
+              acknowledge.error ? <p role="alert">{message(acknowledge.error)}</p> : undefined
+            }
+          />
+        </div>
       </div>
       <div className="store-grid-two">
         <Card>
@@ -102,50 +206,26 @@ export function CommandCenter() {
         </Card>
         <Card>
           <h2>Loading and fleet</h2>
-          <p>
-            Not started {data.loading.notStarted} · in progress {data.loading.inProgress} ·
-            exception {data.loading.exception}
-          </p>
-          <p>
-            Ready {data.loading.ready} · departed {data.loading.departed}
-          </p>
-          <p>
-            Available vehicles {data.fleet.available} · unavailable {data.fleet.unavailable}
-          </p>
-          <p>
-            Pending loading issues {data.pendingLoadingIssues} · sync conflicts{' '}
-            {data.pendingSyncConflicts}
-          </p>
+          <dl className="dispatch-loading-stats">
+            {[
+              ['Not started', data.loading.notStarted],
+              ['In progress', data.loading.inProgress],
+              ['Exceptions', data.loading.exception],
+              ['Ready', data.loading.ready],
+              ['Departed', data.loading.departed],
+              ['Available vehicles', data.fleet.available],
+              ['Unavailable vehicles', data.fleet.unavailable],
+              ['Pending loading issues', data.pendingLoadingIssues],
+              ['Sync conflicts', data.pendingSyncConflicts],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
         </Card>
       </div>
-      <ActionList
-        title="Needs action"
-        items={exceptions.data.items.map((item) => {
-          const shortfall = item.type === 'loading_shortfall';
-          return {
-            id: `${item.type}:${item.entityId}`,
-            title: item.title,
-            // A loader cannot mark the load ready until the shortfall is acknowledged here.
-            description: shortfall ? `${item.reason} · select to acknowledge` : item.reason,
-            tone:
-              item.severity === 'high'
-                ? 'danger'
-                : item.severity === 'medium'
-                  ? 'warning'
-                  : 'neutral',
-            disabled: shortfall && acknowledge.isPending,
-            onClick: shortfall
-              ? () => acknowledge.mutate(item.entityId)
-              : () => navigate(`${links[item.type]}?date=${date}`),
-          };
-        })}
-        footer={acknowledge.error ? <p role="alert">{message(acknowledge.error)}</p> : undefined}
-      />
-      <p className="wp-muted">
-        <Tag kind="blocks-publish" /> hard violations stay separate from <Tag kind="recommended" />{' '}
-        ranked suggestions. Exception links in the API point at resources, so these rows open the
-        matching workspace screen.
-      </p>
     </Page>
   );
 }

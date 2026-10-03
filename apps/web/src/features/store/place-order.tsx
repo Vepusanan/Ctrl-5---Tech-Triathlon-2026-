@@ -207,7 +207,7 @@ export function PlaceOrder() {
         />
       )}
       <form
-        className="store-split"
+        className="store-split store-order-form"
         onSubmit={(event) => {
           event.preventDefault();
           setError('');
@@ -228,7 +228,7 @@ export function PlaceOrder() {
             ))}
           </div>
         </Card>
-        <div className="store-stack">
+        <div className="store-stack store-order-summary">
           <Card>
             <h2>Summary</h2>
             {slots.map((slot) => {

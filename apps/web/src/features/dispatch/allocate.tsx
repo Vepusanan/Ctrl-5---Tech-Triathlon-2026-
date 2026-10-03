@@ -86,7 +86,7 @@ export function AllocationWorkspace() {
         {board.error && <p role="alert">{board.error}</p>}
         {board.inputError && <p role="alert">{board.inputError}</p>}
       </div>
-      <div className="dispatch-board">
+      <div className="dispatch-board" data-advisor={chosen && hint ? true : undefined}>
         <section
           className="dispatch-queue"
           aria-label="Unallocated orders"
@@ -240,38 +240,38 @@ export function AllocationWorkspace() {
             );
           })}
         </div>
+        {chosen && hint && (
+          <div className="dispatch-recommendation">
+            <RecommendationCard
+              title={`Recommendation for ${chosen.outletId}`}
+              description={
+                hint.feasible
+                  ? `Priority score ${hint.score.total.toFixed(0)}. ${hint.checked} trips pass every hard constraint. Accepting still re-checks the plan before anything is saved.`
+                  : `Priority score ${hint.score.total.toFixed(0)}. No trip passes validation, so this score cannot place the order.`
+              }
+              reasons={[
+                `Deferred yesterday ${hint.score.deferredYesterday}`,
+                `Days since served ${hint.score.daysSinceLastServed}`,
+                `Chilled ${hint.score.chilled}`,
+                `Fresh before 08:00 ${hint.score.freshBefore8}`,
+                `Tight window ${hint.score.tightWindow}`,
+                'These weights rank the queue. They are not an exception to a hard constraint.',
+              ]}
+              {...(hint.feasible && !board.published && board.online
+                ? {
+                    onAccept: () => {
+                      const target = hint.feasible;
+                      if (target) {
+                        tryAssign(chosen, { vehicleId: target.vehicleId, tripNo: target.tripNo });
+                      }
+                    },
+                  }
+                : {})}
+              onReject={() => setSelected(null)}
+            />
+          </div>
+        )}
       </div>
-      {chosen && hint && (
-        <div className="dispatch-recommendation">
-          <RecommendationCard
-            title={`Recommendation for ${chosen.outletId}`}
-            description={
-              hint.feasible
-                ? `Priority score ${hint.score.total.toFixed(0)}. ${hint.checked} trips pass every hard constraint. Accepting still re-checks the plan before anything is saved.`
-                : `Priority score ${hint.score.total.toFixed(0)}. No trip passes validation, so this score cannot place the order.`
-            }
-            reasons={[
-              `Deferred yesterday ${hint.score.deferredYesterday}`,
-              `Days since served ${hint.score.daysSinceLastServed}`,
-              `Chilled ${hint.score.chilled}`,
-              `Fresh before 08:00 ${hint.score.freshBefore8}`,
-              `Tight window ${hint.score.tightWindow}`,
-              'These weights rank the queue. They are not an exception to a hard constraint.',
-            ]}
-            {...(hint.feasible && !board.published && board.online
-              ? {
-                  onAccept: () => {
-                    const target = hint.feasible;
-                    if (target) {
-                      tryAssign(chosen, { vehicleId: target.vehicleId, tripNo: target.tripNo });
-                    }
-                  },
-                }
-              : {})}
-            onReject={() => setSelected(null)}
-          />
-        </div>
-      )}
     </Page>
   );
 }

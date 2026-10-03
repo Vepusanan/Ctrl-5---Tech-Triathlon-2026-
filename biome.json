@@ -15,5 +15,11 @@
       "style": { "useImportType": "error" },
       "correctness": { "noUnusedVariables": "error", "useExhaustiveDependencies": "warn" }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/web/public/waypoint/auth/*.svg"],
+      "linter": { "rules": { "a11y": { "noSvgWithoutTitle": "off" } } }
+    }
+  ]
 }

@@ -103,10 +103,10 @@ export function DispatchWorkspaceApp({ user }: { user: Dispatcher }) {
     ['Command center', '/dispatcher', 'Home', '2176-24573'],
     ['Planning queue', '/dispatcher/queue', 'List', '2176-24573'],
     ['Allocation', '/dispatcher/allocate', 'Truck', '2047-5268'],
-    ['Conflicts', '/dispatcher/conflicts', 'Alert', '2047-5268'],
+    ['Validation', '/dispatcher/conflicts', 'Alert', '2047-5268'],
     ['Deferrals', '/dispatcher/deferrals', 'History', '2176-24573'],
-    ['What-if', '/dispatcher/simulate', 'Sliders', 'figma'],
-    ['Review', '/dispatcher/review', 'Check', '2047-5268'],
+    ['What-if simulator', '/dispatcher/simulate', 'Sliders', 'figma'],
+    ['Review & publish', '/dispatcher/review', 'Check', '2047-5268'],
     ['Notifications', '/dispatcher/notifications', 'Bell', '2176-24573'],
     ['Live operations', '/dispatcher/live', 'Route', 'figma'],
   ] as const;
@@ -121,20 +121,27 @@ export function DispatchWorkspaceApp({ user }: { user: Dispatcher }) {
         <AppShell
           navigation={[
             {
-              label: user.depotId ?? 'All depots',
-              items: nav.map(([label, href, icon, source]) => ({
-                label,
-                href: `${href}?date=${date}`,
-                active: current?.[1] === href,
-                icon:
-                  source === 'figma' ? (
-                    <FigmaIcon name={icon} />
-                  ) : (
-                    <StoreIcon name={icon} source={source} />
-                  ),
-              })),
+              label: 'Operations',
+              items: nav.filter((item) => item[1] !== '/dispatcher/simulate'),
             },
-          ]}
+            {
+              label: 'Intelligence',
+              items: nav.filter((item) => item[1] === '/dispatcher/simulate'),
+            },
+          ].map((group) => ({
+            label: group.label,
+            items: group.items.map(([label, href, icon, source]) => ({
+              label,
+              href: `${href}?date=${date}`,
+              active: current?.[1] === href,
+              icon:
+                source === 'figma' ? (
+                  <FigmaIcon name={icon} />
+                ) : (
+                  <StoreIcon name={icon} source={source} />
+                ),
+            })),
+          }))}
           sidebarFooter={
             <>
               <strong>{user.name}</strong>
@@ -232,10 +239,12 @@ async function operatingToday(): Promise<{ today: string; demoNow: string | null
 export function Page({
   title,
   description,
+  actions,
   children,
 }: {
   title: string;
   description: string;
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -245,6 +254,7 @@ export function Page({
           <h1 tabIndex={-1}>{title}</h1>
           <p className="wp-muted">{description}</p>
         </div>
+        {actions && <div className="store-actions">{actions}</div>}
       </header>
       {children}
     </>
