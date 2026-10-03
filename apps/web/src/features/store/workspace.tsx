@@ -133,7 +133,8 @@ function StoreLayout({ user }: { user: Manager }) {
     queryKey: [...storeKey(user.id), 'workspace'],
     queryFn: () => api('/store/workspace', storeWorkspaceSchema),
     retry: false,
-    refetchInterval: 15_000,
+    // SYSTEM_DESIGN §11.2: roles other than the dispatcher poll their own views every 30 s.
+    refetchInterval: 30_000,
   });
   if (workspace.isPending) {
     return (

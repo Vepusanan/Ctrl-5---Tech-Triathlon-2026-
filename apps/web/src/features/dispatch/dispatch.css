@@ -126,3 +126,53 @@
 .dispatch-chip {
   cursor: grab;
 }
+
+/* Dispatcher notification feed (top bar bell). */
+.dispatch-notices {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.dispatch-notices-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.dispatch-notices-head h2 {
+  margin: 0;
+}
+
+.dispatch-notices-list {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dispatch-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12);
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-subtle);
+}
+
+.dispatch-notice.is-unread {
+  background: var(--color-status-warning-subtle);
+}
+
+.dispatch-notice-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 160px;
+}
+
+.dispatch-notice-text small {
+  color: var(--color-text-secondary);
+}

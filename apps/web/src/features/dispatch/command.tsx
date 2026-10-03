@@ -31,17 +31,17 @@ const links: Record<DashboardException['type'], string> = {
 };
 
 export function CommandCenter() {
-  const { date } = useDispatch();
+  const { date, pollMs } = useDispatch();
   const navigate = useNavigate();
   const summary = useQuery({
     queryKey: ['dashboard', date, 'summary'],
     queryFn: () => api(`/dashboard/summary?date=${date}`, dashboardSummarySchema),
-    refetchInterval: 15_000,
+    refetchInterval: pollMs,
   });
   const exceptions = useQuery({
     queryKey: ['dashboard', date, 'exceptions'],
     queryFn: () => api(`/dashboard/exceptions?date=${date}`, dashboardExceptionsSchema),
-    refetchInterval: 15_000,
+    refetchInterval: pollMs,
   });
   const client = useQueryClient();
   // A loader cannot mark the load ready until every shortfall is acknowledged here.

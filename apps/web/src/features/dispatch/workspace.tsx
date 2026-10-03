@@ -25,10 +25,11 @@ import { DeferralCenter } from './deferrals';
 import { DemoClock } from './demo-clock';
 import { VehicleInspector } from './inspector';
 import { LiveOperations } from './live';
+import { DispatchNotifications, useDispatchNotifications } from './notifications';
 import { PlanningQueuePage } from './queue';
 import { ReviewPublish } from './review';
 import { WhatIfSimulator } from './simulate';
-import { useDashboardStream } from './stream';
+import { pollInterval, type StreamState, useDashboardStream } from './stream';
 import './dispatch.css';
 
 type Dispatcher = Extract<User, { role: 'dispatcher' }>;
@@ -39,6 +40,10 @@ interface DispatchContextValue {
   setDate: (date: string) => void;
   dates: string[];
   online: boolean;
+  /** Whether dashboard changes arrive over SSE, by polling, or not at all (offline). */
+  stream: StreamState;
+  /** Refetch interval for dashboard queries: 15 s while the stream is down (§11.2). */
+  pollMs: number | false;
 }
 
 const DispatchContext = createContext<DispatchContextValue | null>(null);
@@ -189,7 +194,10 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
   const nextRun = today ? dates.find((day) => day > today) : undefined;
   const date = requested && dates.includes(requested) ? requested : (nextRun ?? dates.at(-1) ?? '');
   const online = useOnline();
-  useDashboardStream(date, online && date.length > 0);
+  const stream = useDashboardStream(date, user.id, online);
+  const pollMs = pollInterval(stream);
+  const notices = useDispatchNotifications(user.id, pollMs);
+  const [noticesOpen, setNoticesOpen] = useState(false);
   const location = useLocation();
   const setDate = (next: string) => {
     const query = new URLSearchParams(params);
@@ -228,7 +236,7 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
       : location.pathname.startsWith(item[1]),
   );
   return (
-    <DispatchContext.Provider value={{ user, date, setDate, dates, online }}>
+    <DispatchContext.Provider value={{ user, date, setDate, dates, online, stream, pollMs }}>
       <div className="dispatch-workspace">
         <AppShell
           navigation={[
@@ -269,6 +277,9 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
               title={current?.[0] ?? 'Command center'}
               searchPlaceholder="Planning date"
               connectivity={online ? 'online' : 'offline'}
+              context={streamLabel[stream]}
+              onNotifications={() => setNoticesOpen((open) => !open)}
+              notificationCount={notices.unread}
               profile={
                 <label className="dispatch-date">
                   <span className="wp-sr-only">Service date</span>
@@ -282,6 +293,14 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
             />
           }
         >
+          {noticesOpen && (
+            <DispatchNotifications
+              userId={user.id}
+              date={date}
+              feed={notices}
+              onClose={() => setNoticesOpen(false)}
+            />
+          )}
           {!user.depotId && (
             <ErrorState
               title="No depot assigned"
@@ -309,6 +328,12 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
     </DispatchContext.Provider>
   );
 }
+
+const streamLabel: Record<StreamState, string> = {
+  live: 'Live updates',
+  polling: 'Reconnecting · refreshing every 15 s',
+  offline: 'Offline · showing the last loaded data',
+};
 
 // The operating clock's Asia/Colombo date. GET /admin/clock exists only in DEMO_MODE; without
 // it the server follows the host clock, so the device's time gives the same day.

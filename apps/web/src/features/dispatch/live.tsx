@@ -29,17 +29,17 @@ const tripBadge: Record<TripStatus, Status> = {
 };
 
 export function LiveOperations() {
-  const { date, online } = useDispatch();
+  const { date, online, pollMs } = useDispatch();
   const client = useQueryClient();
   const summary = useQuery({
     queryKey: ['dashboard', date, 'summary'],
     queryFn: () => api(`/dashboard/summary?date=${date}`, dashboardSummarySchema),
-    refetchInterval: 15_000,
+    refetchInterval: pollMs,
   });
   const trips = useQuery({
     queryKey: ['trips', date],
     queryFn: () => api(`/trips?date=${date}`, tripListResponseSchema),
-    refetchInterval: 15_000,
+    refetchInterval: pollMs,
   });
   const acknowledge = useMutation({
     mutationFn: (issueId: string) =>
