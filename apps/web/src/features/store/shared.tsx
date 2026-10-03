@@ -1,13 +1,7 @@
-import type {
-  IssueType,
-  OrderStatus,
-  ReasonCode,
-  StoreOrder,
-  TemperatureRequirement,
-} from '@waypoint/shared';
+import type { OrderStatus, ReasonCode, StoreOrder, TemperatureRequirement } from '@waypoint/shared';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Card, HeroMetric, type Status, StatusBadge, Tag } from '../../components/waypoint';
+import { Button, HeroMetric, type Status } from '../../components/waypoint';
 
 export function StoreIcon({ name, source }: { name: string; source: string }) {
   return <img className="wp-icon" src={`/waypoint/store/${source}-imgIcon${name}.svg`} alt="" />;
@@ -46,7 +40,7 @@ export const clockLabel = (now: number) =>
     hourCycle: 'h23',
   }).format(now);
 
-export function colomboHour(now: number) {
+function colomboHour(now: number) {
   return Number(
     new Intl.DateTimeFormat('en-GB', {
       timeZone: colombo,
@@ -97,12 +91,6 @@ export const reasonText: Record<ReasonCode, string> = {
   FUEL_QUOTA: 'The trip exceeds the vehicle’s remaining fuel quota.',
 };
 
-export const issueLabel: Record<IssueType, string> = {
-  missing: 'Short delivery',
-  damaged: 'Damaged goods',
-  incorrect: 'Wrong item',
-};
-
 export function useServerNow(serverNow: string, updatedAt: number) {
   const [anchor, setAnchor] = useState(() => ({
     server: Date.parse(serverNow),
@@ -137,8 +125,8 @@ export function useOnline() {
   return online;
 }
 
-export function remaining(cutoff: string | null, now: number) {
-  if (!cutoff) return 'Unavailable';
+function remaining(cutoff: string | null, now: number) {
+  if (!cutoff) return '—';
   const ms = Date.parse(cutoff) - now;
   if (ms <= 0) return 'Locked';
   const minutes = Math.ceil(ms / 60000);
@@ -213,34 +201,6 @@ export function CutoffCard({
             : `Closes ${time(cutoff)}. Later orders go to the next operating day.`
       }
     />
-  );
-}
-
-export function OrderSummary({ detail }: { detail: StoreOrder }) {
-  const order = detail.order;
-  return (
-    <Card>
-      <div className="wp-between">
-        <h2>{orderName(order.id)}</h2>
-        <StatusBadge status={statusForOrder[order.status]} />
-      </div>
-      <Tag kind={order.temp === 'chilled' ? 'chilled' : 'ambient'} />
-      <div className="store-totals">
-        <div>
-          <strong>{order.units}</strong>
-          <small>units</small>
-        </div>
-        <div>
-          <strong>{order.weightKg}</strong>
-          <small>kg</small>
-        </div>
-        <div>
-          <strong>{order.volumeM3}</strong>
-          <small>m³</small>
-        </div>
-      </div>
-      <p className="wp-muted">Requested {day(order.requestedDate)}</p>
-    </Card>
   );
 }
 

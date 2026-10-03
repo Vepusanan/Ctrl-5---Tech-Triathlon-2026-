@@ -20,7 +20,7 @@ import {
 
 export type TripSlot = { vehicleId: string; tripNo: 1 | 2; orderIds: string[] };
 
-export function orderLite(item: PlanningQueueItem): OrderLite {
+function orderLite(item: PlanningQueueItem): OrderLite {
   return {
     id: item.id,
     outletId: item.outletId,
@@ -135,19 +135,6 @@ export function recommendation(
     .filter((option) => option.check.inputError === null && option.check.violations.length === 0);
   const best = feasible[0];
   return { score, feasible: best ? best.slot : null, checked: feasible.length };
-}
-
-export function violationsFor(
-  violations: Violation[],
-  orderId: string,
-  vehicleId?: string,
-): Violation[] {
-  return violations.filter(
-    (item) =>
-      item.orderId === orderId ||
-      (vehicleId !== undefined && item.vehicleId === vehicleId) ||
-      (item.orderId === undefined && item.vehicleId === undefined),
-  );
 }
 
 export function panelItems(violations: Violation[]) {

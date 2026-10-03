@@ -1,16 +1,11 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { calendarListResponseSchema, currentUserResponseSchema, type User } from '@waypoint/shared';
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { calendarListResponseSchema, orderListResponseSchema, type User } from '@waypoint/shared';
+import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { Navigate, Outlet, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
-import {
-  AppShell,
-  Button,
-  ErrorState,
-  FigmaIcon,
-  LoadingState,
-  TopBar,
-} from '../../components/waypoint';
-import { api, HttpError, message, noContent } from '../../lib/api';
+import { AppShell, ErrorState, FigmaIcon, LoadingState, TopBar } from '../../components/waypoint';
+import { api, message } from '../../lib/api';
+import { SignOut } from '../auth/auth';
+import { Notifications } from '../auth/notifications';
 import { StoreIcon, useOnline } from '../store/shared';
 import { AllocationWorkspace } from './allocate';
 import { CommandCenter } from './command';
@@ -42,126 +37,14 @@ export function useDispatch() {
   return value;
 }
 
-export function DispatchWorkspaceApp() {
-  const client = useQueryClient();
-  const session = useQuery({
-    queryKey: ['session'],
-    queryFn: () => api('/auth/me', currentUserResponseSchema),
-    retry: false,
-  });
-  useEffect(() => {
-    const expired = () => client.setQueryData(['session'], null);
-    window.addEventListener('waypoint:unauthenticated', expired);
-    return () => window.removeEventListener('waypoint:unauthenticated', expired);
-  }, [client]);
-  if (session.isPending) {
-    return (
-      <main className="store-signin">
-        <LoadingState label="Checking your session…" />
-      </main>
-    );
-  }
-  if (session.error && !(session.error instanceof HttpError && session.error.status === 401)) {
-    return (
-      <main className="store-signin">
-        <ErrorState description={message(session.error)} onRetry={() => void session.refetch()} />
-      </main>
-    );
-  }
-  if (!session.data) return <DispatchSignIn />;
-  if (session.data.user.role !== 'dispatcher') {
-    return (
-      <main className="store-signin">
-        <ErrorState
-          title="Dispatcher access required"
-          description="This workspace is for planning staff."
-        />
-        <SignOut />
-      </main>
-    );
-  }
-  return <DispatchLayout user={session.data.user} />;
-}
-
-function DispatchSignIn() {
-  const client = useQueryClient();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  return (
-    <main className="store-signin">
-      <a className="wp-brand" href="/">
-        <span>W</span>Waypoint
-      </a>
-      <form
-        className="wp-card store-form"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          setBusy(true);
-          setError('');
-          try {
-            const data = await api('/auth/login', currentUserResponseSchema, {
-              method: 'POST',
-              body: JSON.stringify({ email, password }),
-            });
-            client.setQueryData(['session'], data);
-          } catch (cause) {
-            setError(message(cause));
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <h1>Dispatcher sign in</h1>
-        <p className="wp-muted">Plan, allocate and publish the delivery run.</p>
-        <label>
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <Button type="submit" busy={busy}>
-          Sign in
-        </Button>
-      </form>
-    </main>
-  );
-}
-
-function SignOut() {
-  const client = useQueryClient();
-  return (
-    <Button
-      variant="tertiary"
-      onClick={async () => {
-        await api('/auth/logout', noContent, { method: 'POST' }).catch(() => undefined);
-        client.clear();
-        client.setQueryData(['session'], null);
-      }}
-    >
-      Sign out
-    </Button>
-  );
-}
-
-function DispatchLayout({ user }: { user: Dispatcher }) {
+export function DispatchWorkspaceApp({ user }: { user: Dispatcher }) {
   const calendar = useQuery({
     queryKey: ['calendar'],
     queryFn: () => api('/calendar', calendarListResponseSchema),
+  });
+  const orders = useQuery({
+    queryKey: ['dispatcher', user.id, 'service-dates'],
+    queryFn: () => api('/orders', orderListResponseSchema),
   });
   const dates = useMemo(
     () =>
@@ -173,7 +56,17 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
   );
   const [params, setParams] = useSearchParams();
   const requested = params.get('date');
-  const date = requested && dates.includes(requested) ? requested : (dates.at(-1) ?? '');
+  const operatingDates = (orders.data?.items ?? [])
+    .filter(
+      (order) => !['cancelled', 'draft', 'submitted', 'receipt_confirmed'].includes(order.status),
+    )
+    .map((order) => order.requestedDate)
+    .filter((date) => dates.includes(date))
+    .sort();
+  const date =
+    requested && dates.includes(requested)
+      ? requested
+      : (operatingDates.at(-1) ?? dates.at(-1) ?? '');
   const online = useOnline();
   useDashboardStream(date, online && date.length > 0);
   const location = useLocation();
@@ -182,10 +75,17 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
     query.set('date', next);
     setParams(query);
   };
-  if (calendar.isPending) return <LoadingState label="Loading the operating calendar…" />;
-  if (!calendar.data) {
+  if (calendar.isPending || orders.isPending)
+    return <LoadingState label="Loading the operating calendar…" />;
+  if (!calendar.data || !orders.data) {
     return (
-      <ErrorState description={message(calendar.error)} onRetry={() => void calendar.refetch()} />
+      <ErrorState
+        description={message(calendar.error ?? orders.error)}
+        onRetry={() => {
+          void calendar.refetch();
+          void orders.refetch();
+        }}
+      />
     );
   }
   if (!date) {
@@ -197,18 +97,19 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
     );
   }
   const nav = [
-    ['Command center', '/dispatch', 'Home', '2176-24573'],
-    ['Planning queue', '/dispatch/queue', 'List', '2176-24573'],
-    ['Allocation', '/dispatch/allocate', 'Truck', '2047-5268'],
-    ['Conflicts', '/dispatch/conflicts', 'Alert', '2047-5268'],
-    ['Deferrals', '/dispatch/deferrals', 'History', '2176-24573'],
-    ['What-if', '/dispatch/simulate', 'Sliders', 'figma'],
-    ['Review', '/dispatch/review', 'Check', '2047-5268'],
-    ['Live operations', '/dispatch/live', 'Route', 'figma'],
+    ['Command center', '/dispatcher', 'Home', '2176-24573'],
+    ['Planning queue', '/dispatcher/queue', 'List', '2176-24573'],
+    ['Allocation', '/dispatcher/allocate', 'Truck', '2047-5268'],
+    ['Conflicts', '/dispatcher/conflicts', 'Alert', '2047-5268'],
+    ['Deferrals', '/dispatcher/deferrals', 'History', '2176-24573'],
+    ['What-if', '/dispatcher/simulate', 'Sliders', 'figma'],
+    ['Review', '/dispatcher/review', 'Check', '2047-5268'],
+    ['Notifications', '/dispatcher/notifications', 'Bell', '2176-24573'],
+    ['Live operations', '/dispatcher/live', 'Route', 'figma'],
   ] as const;
   const current = nav.find((item) =>
-    item[1] === '/dispatch'
-      ? location.pathname === '/dispatch'
+    item[1] === '/dispatcher'
+      ? location.pathname === '/dispatcher'
       : location.pathname.startsWith(item[1]),
   );
   return (
@@ -265,8 +166,9 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
           )}
           {user.depotId && (
             <Routes>
-              <Route path="/dispatch" element={<Outlet />}>
+              <Route path="/" element={<Outlet />}>
                 <Route index element={<CommandCenter />} />
+                <Route path="notifications" element={<Notifications user={user} />} />
                 <Route path="queue" element={<PlanningQueuePage />} />
                 <Route path="allocate" element={<AllocationWorkspace />} />
                 <Route path="vehicles/:vehicleId" element={<VehicleInspector />} />
@@ -275,7 +177,7 @@ function DispatchLayout({ user }: { user: Dispatcher }) {
                 <Route path="simulate" element={<WhatIfSimulator />} />
                 <Route path="review" element={<ReviewPublish />} />
                 <Route path="live" element={<LiveOperations />} />
-                <Route path="*" element={<Navigate to={`/dispatch?date=${date}`} replace />} />
+                <Route path="*" element={<Navigate to={`/dispatcher?date=${date}`} replace />} />
               </Route>
             </Routes>
           )}

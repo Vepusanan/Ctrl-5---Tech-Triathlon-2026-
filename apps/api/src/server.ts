@@ -1,6 +1,6 @@
 import { createDatabase, loadSeedEnv } from '@waypoint/database';
 import { buildApp } from './app.ts';
-import { loadEnv } from './config/env.ts';
+import { loadEnv, secureSessionCookies } from './config/env.ts';
 
 const env = loadEnv(process.env);
 const seedEnv = env.DEMO_MODE ? loadSeedEnv(process.env) : undefined;
@@ -12,7 +12,7 @@ const app = await buildApp({
   db: connection.db,
   logger: { level: env.LOG_LEVEL },
   sessionSecret: env.SESSION_SECRET,
-  secureCookies: process.env.NODE_ENV === 'production',
+  secureCookies: secureSessionCookies(env, process.env.NODE_ENV === 'production'),
   demoMode: env.DEMO_MODE,
   ...(seedEnv === undefined
     ? {}

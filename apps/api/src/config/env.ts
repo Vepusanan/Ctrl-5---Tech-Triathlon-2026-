@@ -7,6 +7,8 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: databaseUrlSchema,
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
+  SECURE_COOKIES: z.stringbool().optional(),
+  DOMAIN: z.string().optional(),
   DEMO_MODE: z.stringbool().default(false),
   DEMO_DATE: z.iso.date().optional(),
 });
@@ -17,4 +19,14 @@ export function loadEnv(source: NodeJS.ProcessEnv): z.infer<typeof envSchema> {
     throw new Error(`Invalid environment:\n${z.prettifyError(result.error)}`);
   }
   return result.data;
+}
+
+export function secureSessionCookies(
+  env: { SECURE_COOKIES?: boolean | undefined; DOMAIN?: string | undefined },
+  production: boolean,
+): boolean {
+  return (
+    env.SECURE_COOKIES ??
+    (production && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(env.DOMAIN ?? ''))
+  );
 }

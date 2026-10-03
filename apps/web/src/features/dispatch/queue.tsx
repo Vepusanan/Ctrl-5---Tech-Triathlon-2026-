@@ -71,7 +71,7 @@ export function PlanningQueuePage() {
           />
           Prior deferral
         </label>
-        <Link to={`/dispatch/allocate?date=${date}`}>Open allocation</Link>
+        <Link to={`/dispatcher/allocate?date=${date}`}>Open allocation</Link>
       </div>
       <DataTable
         caption="Orders waiting for planning"

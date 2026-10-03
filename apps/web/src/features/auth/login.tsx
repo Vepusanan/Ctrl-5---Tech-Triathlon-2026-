@@ -1,22 +1,15 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { currentUserResponseSchema } from '@waypoint/shared';
+import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button, Card } from '../../components/waypoint';
-import { api, message } from '../../lib/api';
-export function StoreSignIn() {
-  const client = useQueryClient();
+import { message } from '../../lib/api';
+import { SystemStatus } from '../health/system-status';
+import { useAuth } from './auth';
+export function SignIn() {
+  const { login: signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const login = useMutation({
-    mutationFn: () =>
-      api('/auth/login', currentUserResponseSchema, {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      }),
-    onSuccess: (data) => {
-      client.clear();
-      client.setQueryData(['session'], data);
-    },
+    mutationFn: () => signIn(email, password),
   });
   return (
     <main className="store-signin">
@@ -24,8 +17,8 @@ export function StoreSignIn() {
         <span>W</span>Waypoint
       </a>
       <Card>
-        <h1>Sign in to your store</h1>
-        <p className="wp-muted">Place orders, track deliveries and confirm receipt.</p>
+        <h1>Sign in to Waypoint</h1>
+        <p className="wp-muted">Sign in with your Waypoint account to open your workspace.</p>
         <form
           className="store-form"
           onSubmit={(e) => {
@@ -63,6 +56,7 @@ export function StoreSignIn() {
           </Button>
         </form>
       </Card>
+      <SystemStatus />
     </main>
   );
 }

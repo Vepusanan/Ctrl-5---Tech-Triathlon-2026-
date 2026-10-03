@@ -434,3 +434,13 @@
   background: var(--color-data-pos);
   border-radius: 8px;
 }
+.loader-workspace > nav {
+  display: flex;
+  gap: 16px;
+  padding-inline: 24px;
+}
+.loader-workspace > nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+}

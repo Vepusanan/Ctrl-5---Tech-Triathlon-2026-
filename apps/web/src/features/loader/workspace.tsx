@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  currentUserResponseSchema,
   type LoadingState as Load,
   type LoadingIssueType,
   type LoadingStop,
@@ -19,7 +18,9 @@ import {
   StatusBadge,
   Tag,
 } from '../../components/waypoint';
-import { api, HttpError, message, noContent } from '../../lib/api';
+import { api, message } from '../../lib/api';
+import { SignOut } from '../auth/auth';
+import { Notifications } from '../auth/notifications';
 import { useOnline } from '../store/shared';
 import './loader.css';
 
@@ -35,8 +36,8 @@ const status = (value: Load['status']) =>
       : value === 'exception'
         ? 'loading-exception'
         : value;
-export const reverseStops = (stops: LoadingStop[]) => [...stops].sort((a, b) => b.seq - a.seq);
-export function planDiff(previous: LoadingStop[], current: LoadingStop[]) {
+const reverseStops = (stops: LoadingStop[]) => [...stops].sort((a, b) => b.seq - a.seq);
+function planDiff(previous: LoadingStop[], current: LoadingStop[]) {
   const changes: string[] = [];
   for (const old of previous) {
     const next = current.find((s) => s.order.id === old.order.id);
@@ -68,124 +69,10 @@ const time = (value: string) =>
     minute: '2-digit',
   });
 
-export function LoaderWorkspaceApp() {
-  const client = useQueryClient();
-  const session = useQuery({
-    queryKey: ['session'],
-    queryFn: () => api('/auth/me', currentUserResponseSchema),
-    retry: false,
-  });
-  useEffect(() => {
-    const expired = () => {
-      client.clear();
-      client.setQueryData(['session'], null);
-    };
-    window.addEventListener('waypoint:unauthenticated', expired);
-    return () => window.removeEventListener('waypoint:unauthenticated', expired);
-  }, [client]);
-  if (session.isPending) return <LoadingState label="Checking your session…" />;
-  if (session.error && !(session.error instanceof HttpError && session.error.status === 401))
-    return (
-      <ErrorState description={message(session.error)} onRetry={() => void session.refetch()} />
-    );
-  return (
-    <div className="loader-workspace">
-      {!session.data ? (
-        <SignIn />
-      ) : session.data.user.role !== 'loader' ? (
-        <main>
-          <ErrorState
-            title="Loader access required"
-            description="Sign in as a loader to view your depot’s loads."
-          />
-          <SignOut />
-        </main>
-      ) : (
-        <LoaderHome user={session.data.user} />
-      )}
-    </div>
-  );
-}
-function SignIn() {
-  const client = useQueryClient();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const login = useMutation({
-    mutationFn: () =>
-      api('/auth/login', currentUserResponseSchema, {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      }),
-    onSuccess: (data) => {
-      client.clear();
-      client.setQueryData(['session'], data);
-    },
-  });
-  return (
-    <main className="loader-login">
-      <Card>
-        <div className="wp-brand">
-          <span>W</span>Waypoint
-        </div>
-        <h1>Sign in to your depot</h1>
-        <p>Loader workspace · prepare, verify and release loads.</p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            login.mutate();
-          }}
-        >
-          <label>
-            Email
-            <input
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-          <label>
-            Password
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          {login.error && <p role="alert">{message(login.error)}</p>}
-          <Button type="submit" busy={login.isPending}>
-            Sign in
-          </Button>
-        </form>
-      </Card>
-    </main>
-  );
-}
-function SignOut() {
-  const client = useQueryClient();
-  const logout = useMutation({
-    mutationFn: () => api('/auth/logout', noContent, { method: 'POST' }),
-    onSuccess: () => {
-      client.clear();
-      client.setQueryData(['session'], null);
-    },
-  });
-  return (
-    <>
-      <Button variant="secondary" busy={logout.isPending} onClick={() => logout.mutate()}>
-        {icon('IconUser')}Switch user
-      </Button>
-      {logout.error && <p role="alert">{message(logout.error)}</p>}
-    </>
-  );
-}
-function LoaderHome({ user }: { user: Loader }) {
+export function LoaderWorkspaceApp({ user }: { user: Loader }) {
   const online = useOnline();
   return (
-    <>
+    <div className="loader-workspace">
       <header className="loader-header">
         <Link to="/loader" className="wp-brand" aria-label="Assigned loads">
           <span>W</span>
@@ -199,14 +86,19 @@ function LoaderHome({ user }: { user: Loader }) {
         <strong>{user.name}</strong>
         <SignOut />
       </header>
+      <nav aria-label="Loader navigation">
+        <Link to="/loader">Assigned loads</Link>
+        <Link to="/loader/notifications">Notifications</Link>
+      </nav>
       {!online && (
         <p className="loader-notice" role="alert">
           Offline. Reconnect and refresh before updating a load.
         </p>
       )}
       <Routes>
-        <Route path="/loader" element={<Assigned user={user} />} />
-        <Route path="/loader/trips/:id/*" element={<TripWorkspace user={user} online={online} />} />
+        <Route path="notifications" element={<Notifications user={user} />} />
+        <Route path="/" element={<Assigned user={user} />} />
+        <Route path="trips/:id/*" element={<TripWorkspace user={user} online={online} />} />
         <Route
           path="*"
           element={
@@ -217,7 +109,7 @@ function LoaderHome({ user }: { user: Loader }) {
           }
         />
       </Routes>
-    </>
+    </div>
   );
 }
 function Assigned({ user }: { user: Loader }) {

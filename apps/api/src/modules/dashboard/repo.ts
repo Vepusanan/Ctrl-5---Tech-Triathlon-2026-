@@ -42,7 +42,7 @@ export interface DashboardScope {
   depotId: string | null;
 }
 
-export interface OrderCount {
+interface OrderCount {
   status: OrderStatus;
   total: number;
 }
@@ -59,7 +59,7 @@ export interface DeferredOrder {
   createdAt: Date;
 }
 
-export interface TripFact {
+interface TripFact {
   id: string;
   vehicleId: string;
   tripNo: number;
@@ -97,7 +97,7 @@ export interface FieldEventFact {
   payload: StopEvent['payload'];
 }
 
-export interface LoadingIssueFact {
+interface LoadingIssueFact {
   id: string;
   tripId: string;
   orderId: string;
@@ -107,7 +107,7 @@ export interface LoadingIssueFact {
   createdAt: Date;
 }
 
-export interface ConflictFact {
+interface ConflictFact {
   id: string;
   reason: string;
   createdAt: Date;
@@ -115,7 +115,7 @@ export interface ConflictFact {
   stopId: string;
 }
 
-export interface OpenIssueFact {
+interface OpenIssueFact {
   id: string;
   orderId: string;
   type: IssueType;
@@ -123,7 +123,7 @@ export interface OpenIssueFact {
   createdAt: Date;
 }
 
-export interface VehicleFact {
+interface VehicleFact {
   id: string;
   type: VehicleType;
   temp: VehicleTemperature;
@@ -134,23 +134,23 @@ export interface VehicleFact {
   availability: VehicleAvailabilityStatus;
 }
 
-export interface DriverFact {
+interface DriverFact {
   id: string;
   name: string;
   vehicleId: string | null;
 }
 
-export interface FuelFact {
+interface FuelFact {
   tripId: string;
   litres: number;
 }
 
-export interface DepartureFact {
+interface DepartureFact {
   tripId: string;
   departedAt: Date;
 }
 
-export interface LoadingFact {
+interface LoadingFact {
   tripId: string;
   status: LoadingStatus;
 }
@@ -172,7 +172,7 @@ export interface DaySnapshot {
   departures: DepartureFact[];
 }
 
-export interface AuditFact {
+interface AuditFact {
   id: string;
   actorId: string;
   role: Role;

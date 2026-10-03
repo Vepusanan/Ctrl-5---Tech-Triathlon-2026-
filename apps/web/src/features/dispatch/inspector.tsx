@@ -109,7 +109,7 @@ export function VehicleInspector() {
       <div className="dispatch-why">
         <ViolationPanel title="Hard violations" violations={panelItems(violations)} />
       </div>
-      <Link to={`/dispatch/allocate?date=${date}`}>Back to allocation</Link>
+      <Link to={`/dispatcher/allocate?date=${date}`}>Back to allocation</Link>
     </Page>
   );
 }

@@ -77,8 +77,8 @@ export function AllocationWorkspace() {
         >
           Auto-allocate feasible plan
         </Button>
-        <Link to={`/dispatch/conflicts?date=${date}`}>Constraint conflicts</Link>
-        <Link to={`/dispatch/review?date=${date}`}>Review and publish</Link>
+        <Link to={`/dispatcher/conflicts?date=${date}`}>Constraint conflicts</Link>
+        <Link to={`/dispatcher/review?date=${date}`}>Review and publish</Link>
         {board.published && <Tag kind="blocks-publish">Published — edits are closed</Tag>}
       </div>
       <div className="dispatch-why">
@@ -182,7 +182,7 @@ export function AllocationWorkspace() {
                 }
               >
                 <header>
-                  <Link to={`/dispatch/vehicles/${slot.vehicleId}?date=${date}`}>
+                  <Link to={`/dispatcher/vehicles/${slot.vehicleId}?date=${date}`}>
                     {slot.vehicleId}
                   </Link>
                   <span>Trip {slot.tripNo}</span>

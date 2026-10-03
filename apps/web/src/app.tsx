@@ -1,42 +1,95 @@
-import { BrowserRouter } from 'react-router-dom';
+import { getHomeRoute, type Role, type User } from '@waypoint/shared';
+import type { ReactNode } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './features/auth/auth';
+import { SignIn } from './features/auth/login';
 import { DesignSystem } from './features/design-system/design-system';
 import { DispatchWorkspaceApp } from './features/dispatch/workspace';
-import { SystemStatus } from './features/health/system-status.tsx';
+import { DriverWorkspaceApp } from './features/driver/workspace';
 import { LoaderWorkspaceApp } from './features/loader/workspace';
 import { StoreWorkspaceApp } from './features/store/workspace';
+import './features/store/store.css';
 
-export function App() {
-  const path = window.location.pathname;
-  if (path === '/loader' || path.startsWith('/loader/'))
-    return (
-      <BrowserRouter>
-        <LoaderWorkspaceApp />
-      </BrowserRouter>
-    );
-  if (path === '/store' || path.startsWith('/store/')) {
-    return (
-      <BrowserRouter>
-        <StoreWorkspaceApp />
-      </BrowserRouter>
-    );
-  }
-  if (path === '/dispatch' || path.startsWith('/dispatch/')) {
-    return (
-      <BrowserRouter>
-        <DispatchWorkspaceApp />
-      </BrowserRouter>
-    );
-  }
-  if (path.replace(/\/$/, '') === '/dev/design-system') return <DesignSystem />;
+function RoleGuard<R extends Role>({
+  allowedRole,
+  children,
+}: {
+  allowedRole: R;
+  children: (user: Extract<User, { role: R }>) => ReactNode;
+}) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== allowedRole) return <Navigate to={getHomeRoute(user.role)} replace />;
+  return children(user as Extract<User, { role: R }>);
+}
+
+function Home() {
+  const { user } = useAuth();
+  return <Navigate to={user ? getHomeRoute(user.role) : '/login'} replace />;
+}
+function Login() {
+  const { user } = useAuth();
+  return user ? <Navigate to={getHomeRoute(user.role)} replace /> : <SignIn />;
+}
+function LegacyDispatcher() {
+  const location = useLocation();
   return (
-    <main className="app">
-      <h1>Waypoint</h1>
-      <p>Delivery planning and operations platform.</p>
-      <a href="/dev/design-system">Explore the design system</a>
-      <a href="/dispatch">Open Dispatcher workspace</a>
-      <a href="/loader">Open Loader workspace</a>
-      <a href="/store">Open Store Manager workspace</a>
-      <SystemStatus />
-    </main>
+    <Navigate
+      to={`${location.pathname.replace(/^\/dispatch(?=\/|$)/, '/dispatcher')}${location.search}`}
+      replace
+    />
+  );
+}
+export function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/dev/design-system" element={<DesignSystem />} />
+        <Route
+          path="*"
+          element={
+            <AuthProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route
+                  path="/dispatcher/*"
+                  element={
+                    <RoleGuard allowedRole="dispatcher">
+                      {(user) => <DispatchWorkspaceApp user={user} />}
+                    </RoleGuard>
+                  }
+                />
+                <Route
+                  path="/loader/*"
+                  element={
+                    <RoleGuard allowedRole="loader">
+                      {(user) => <LoaderWorkspaceApp user={user} />}
+                    </RoleGuard>
+                  }
+                />
+                <Route
+                  path="/driver/*"
+                  element={
+                    <RoleGuard allowedRole="driver">
+                      {(user) => <DriverWorkspaceApp user={user} />}
+                    </RoleGuard>
+                  }
+                />
+                <Route
+                  path="/store/*"
+                  element={
+                    <RoleGuard allowedRole="store_manager">
+                      {(user) => <StoreWorkspaceApp user={user} />}
+                    </RoleGuard>
+                  }
+                />
+                <Route path="/dispatch/*" element={<LegacyDispatcher />} />
+                <Route path="*" element={<Home />} />
+              </Routes>
+            </AuthProvider>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }

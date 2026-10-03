@@ -8,7 +8,12 @@ import {
   seedMeta,
   users,
 } from '@waypoint/database';
-import { currentUserResponseSchema, orderListResponseSchema, orderSchema } from '@waypoint/shared';
+import {
+  currentUserResponseSchema,
+  orderListResponseSchema,
+  orderSchema,
+  storeWorkspaceSchema,
+} from '@waypoint/shared';
 import { and, desc, eq, lt, ne } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -45,6 +50,20 @@ describe('demo admin', () => {
   afterAll(async () => {
     await app.close();
     await close?.();
+  });
+
+  it('starts the seeded demo before cutoff so store ordering is usable', async () => {
+    const store = await signIn(app, DEMO_USERS.storeManager.email);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/store/workspace',
+      headers: { cookie: store },
+    });
+    expect(response.statusCode).toBe(200);
+    const workspace = storeWorkspaceSchema.parse(response.json());
+    const [seed] = await app.db.select().from(seedMeta);
+    expect(workspace.eligibleServiceDate).toBe(seed?.serviceDate);
+    expect(workspace.orders.some((item) => item.editable)).toBe(true);
   });
 
   it('lets the dispatcher read and set the operating clock', async () => {
@@ -293,6 +312,7 @@ describe('demo admin', () => {
         expect(hidden.statusCode).toBe(404);
         expect(hidden.json()).toEqual({ error: { code: 'NOT_FOUND', message: 'Route not found' } });
       }
+      expect(Math.abs(disabled.clock.now().getTime() - Date.now())).toBeLessThan(5_000);
       const anonymous = await disabled.inject({ method: 'POST', url: '/api/v1/admin/reset' });
       expect(anonymous.statusCode).toBe(404);
     } finally {

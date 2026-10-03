@@ -60,7 +60,7 @@ export async function buildApp({
   await app.register(errorPlugin);
   await app.register(dbPlugin, { db });
   await app.register(auditPlugin);
-  await app.register(clockPlugin);
+  await app.register(clockPlugin, { demoMode });
   await app.register(domainEventsPlugin);
   await app.register(authPlugin, { sessionSecret, secureCookies });
   await app.register(rbacPlugin);

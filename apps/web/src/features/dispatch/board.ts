@@ -224,5 +224,3 @@ function slotsFromTrips(
   }
   return [...slots.values()];
 }
-
-export type Board = ReturnType<typeof useBoard>;

@@ -8,6 +8,9 @@ import { clearSessionCookieOptions, SESSION_COOKIE, sessionCookieOptions } from 
 const LOGIN_LIMIT = 10;
 
 export const authRoutes: FastifyPluginAsyncZod = async (app) => {
+  app.addHook('onSend', async (request, reply) => {
+    if (request.url.startsWith('/api/v1/auth/')) reply.header('Cache-Control', 'no-store');
+  });
   const service = app.authService;
   const secure = app.secureCookies;
 

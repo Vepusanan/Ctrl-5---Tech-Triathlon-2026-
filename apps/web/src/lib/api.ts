@@ -1,3 +1,9 @@
+let requests = new AbortController();
+export function resetApiRequests() {
+  requests.abort();
+  requests = new AbortController();
+}
+
 export class HttpError extends Error {
   status: number;
   code: string;
@@ -16,10 +22,16 @@ export async function api<T>(
   try {
     response = await fetch(`/api/v1${path}`, {
       ...options,
-      credentials: 'same-origin',
-      signal: options.signal ?? AbortSignal.timeout(20_000),
+      credentials: 'include',
+      signal: AbortSignal.any([
+        requests.signal,
+        AbortSignal.timeout(20_000),
+        ...(options.signal ? [options.signal] : []),
+      ]),
       headers: {
-        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.body && !(options.body instanceof FormData)
+          ? { 'Content-Type': 'application/json' }
+          : {}),
         ...options.headers,
       },
     });
@@ -34,14 +46,16 @@ export async function api<T>(
   }
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
-    const error = body as { code?: string; message?: string } | null;
+    const error = (body as { error?: { code?: string; message?: string } } | null)?.error;
     if (response.status === 401 && path !== '/auth/me' && path !== '/auth/login') {
       window.dispatchEvent(new Event('waypoint:unauthenticated'));
     }
     throw new HttpError(
       response.status,
       error?.code ?? 'REQUEST_FAILED',
-      error?.message ?? 'The request failed. Please try again.',
+      response.status >= 500
+        ? 'The server could not complete your request. Please try again.'
+        : (error?.message ?? 'The request failed. Please try again.'),
     );
   }
   try {

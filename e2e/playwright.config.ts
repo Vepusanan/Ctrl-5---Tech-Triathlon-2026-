@@ -1,4 +1,9 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
+
+const envPath = fileURLToPath(new URL('../.env', import.meta.url));
+if (existsSync(envPath)) process.loadEnvFile(envPath);
 
 const externalBaseUrl = process.env.E2E_BASE_URL;
 

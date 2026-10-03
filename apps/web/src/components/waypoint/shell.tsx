@@ -13,7 +13,7 @@ export interface NavGroup {
     disabled?: boolean;
   }[];
 }
-export function AppSidebar({
+function AppSidebar({
   groups,
   footer,
   onNavigate,

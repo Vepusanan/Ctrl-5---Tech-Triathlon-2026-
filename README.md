@@ -71,3 +71,23 @@ Serves the web build and API through Caddy on `HTTP_PORT` (default 80). Set `DOM
 
 Commits follow Conventional Commits with scopes `web`, `api`, `planning`, `shared`, `database`, `infra`, `docs`
 (for example `feat(api): add health endpoint`), enforced by Husky and commitlint.
+
+## Sign in and role workspaces
+
+Open `/login` for every role. The account determines the workspace; there is no role selector.
+The default seed password is `waypoint-demo` unless `SEED_PASSWORD` was set when the database was seeded.
+An idempotent seed does not change existing passwords.
+
+| Role | Email | Scope | Home route |
+| --- | --- | --- | --- |
+| Dispatcher | dispatcher@waypoint.test | Peliyagoda depot | /dispatcher |
+| Loader | loader@waypoint.test | Peliyagoda depot | /loader |
+| Driver | driver@waypoint.test | Seed-selected Peliyagoda van | /driver |
+| Store Manager | store.manager@waypoint.test | Seed-selected Fresh outlet | /store |
+
+With `DEMO_MODE=true`, startup sets the operating clock before the seeded service day’s cutoff so Store ordering remains usable. The seed report prints the actual vehicle/outlet assignments. Loader/Driver lists remain empty until a plan is published.
+`/dispatch` redirects to `/dispatcher` for existing links.
+
+See [the authentication audit and repair report](docs/AUTH_FLOW_REPAIR.md) for architecture, scope checks, tests, and offline limitations.
+To verify the four real accounts, run `E2E_BASE_URL=http://localhost:8080 E2E_REAL_STACK=true pnpm e2e`
+(adjust the URL for `HTTP_PORT`). Playwright loads `.env` for the seed password.

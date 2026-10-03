@@ -3,7 +3,7 @@ import { auditLog, syncConflicts, trips } from '@waypoint/database';
 import { and, asc, eq } from 'drizzle-orm';
 import type { RouteAudit } from './delta.ts';
 
-export type SyncDb = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
+type SyncDb = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
 
 export interface SyncRepo {
   findConflict(db: SyncDb, eventId: string): Promise<{ id: string; reason: string } | null>;

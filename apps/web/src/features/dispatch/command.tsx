@@ -19,14 +19,14 @@ import { api, message } from '../../lib/api';
 import { Page, useDispatch } from './workspace';
 
 const links: Record<DashboardException['type'], string> = {
-  loading_shortfall: '/dispatch/live',
-  failed_delivery: '/dispatch/live',
-  receipt_discrepancy: '/dispatch/live',
-  sync_conflict: '/dispatch/live',
-  vehicle_unavailable: '/dispatch/allocate',
-  repeat_deferral: '/dispatch/deferrals',
-  stale_driver: '/dispatch/live',
-  tight_window: '/dispatch/conflicts',
+  loading_shortfall: '/dispatcher/live',
+  failed_delivery: '/dispatcher/live',
+  receipt_discrepancy: '/dispatcher/live',
+  sync_conflict: '/dispatcher/live',
+  vehicle_unavailable: '/dispatcher/allocate',
+  repeat_deferral: '/dispatcher/deferrals',
+  stale_driver: '/dispatcher/live',
+  tight_window: '/dispatcher/conflicts',
 };
 
 export function CommandCenter() {

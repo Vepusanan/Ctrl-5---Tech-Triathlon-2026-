@@ -21,9 +21,9 @@ import type {
 } from '@waypoint/shared';
 import { and, desc, eq, isNull, or, type SQL, sql } from 'drizzle-orm';
 
-export type ReceiptDb = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
+type ReceiptDb = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
 
-export interface ReceiptStopRow {
+interface ReceiptStopRow {
   id: string;
   stopStatus: StopStatus;
   orderId: string;
@@ -39,7 +39,7 @@ export interface ReceiptRow {
   confirmedAt: Date;
 }
 
-export interface IssueOrderRow {
+interface IssueOrderRow {
   id: string;
   status: OrderStatus;
   outletId: string;

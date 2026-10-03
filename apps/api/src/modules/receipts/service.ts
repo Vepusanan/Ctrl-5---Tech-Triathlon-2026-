@@ -14,7 +14,7 @@ const MISSING_ORDER = 'Order not found';
 const MISSING_ISSUE = 'Issue not found';
 const NOT_DELIVERED = 'Only a delivered stop can be receipt-confirmed';
 
-export interface ConfirmedReceipt {
+interface ConfirmedReceipt {
   receipt: Receipt;
   created: boolean;
 }

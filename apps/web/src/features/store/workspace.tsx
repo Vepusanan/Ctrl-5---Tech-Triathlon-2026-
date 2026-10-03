@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  currentUserResponseSchema,
   type NotificationFeedItem,
   type NotificationType,
   notificationFeedItemSchema,
@@ -12,8 +11,8 @@ import {
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Link, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AppShell, Button, ErrorState, LoadingState, TopBar } from '../../components/waypoint';
-import { api, HttpError, message, noContent } from '../../lib/api';
-import { StoreSignIn } from './auth';
+import { api, message } from '../../lib/api';
+import { SignOut } from '../auth/auth';
 import { StoreDashboard, StoreIssues, StoreOrders } from './dashboard';
 import { StoreOrderPage } from './order-page';
 import { PlaceOrder } from './place-order';
@@ -53,82 +52,7 @@ const noteCopy: Record<NotificationType, string> = {
   sync_conflict: 'A field update needs review',
 };
 
-export function StoreWorkspaceApp() {
-  const client = useQueryClient();
-  const session = useQuery({
-    queryKey: ['session'],
-    queryFn: () => api('/auth/me', currentUserResponseSchema),
-    retry: false,
-    refetchOnWindowFocus: true,
-  });
-  useEffect(() => {
-    const expired = () => {
-      client.removeQueries({ queryKey: ['store'] });
-      client.setQueryData(['session'], null);
-    };
-    window.addEventListener('waypoint:unauthenticated', expired);
-    return () => window.removeEventListener('waypoint:unauthenticated', expired);
-  }, [client]);
-  if (session.isPending) {
-    return (
-      <main className="store-signin">
-        <LoadingState label="Checking your session…" />
-      </main>
-    );
-  }
-  if (session.error && !(session.error instanceof HttpError && session.error.status === 401)) {
-    return (
-      <main className="store-signin">
-        <ErrorState description={message(session.error)} onRetry={() => void session.refetch()} />
-      </main>
-    );
-  }
-  if (!session.data) return <StoreSignIn />;
-  if (session.data.user.role !== 'store_manager') {
-    return (
-      <main className="store-signin">
-        <ErrorState
-          title="Store Manager access required"
-          description="This workspace is available only to your store’s assigned manager."
-        />
-        <SignOut />
-      </main>
-    );
-  }
-  return <StoreLayout user={session.data.user} />;
-}
-
-function SignOut() {
-  const client = useQueryClient();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  return (
-    <>
-      <Button
-        variant="tertiary"
-        busy={busy}
-        onClick={async () => {
-          setBusy(true);
-          setError('');
-          try {
-            await api('/auth/logout', noContent, { method: 'POST' });
-            client.clear();
-            client.setQueryData(['session'], null);
-          } catch (cause) {
-            setError(message(cause));
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        Sign out
-      </Button>
-      {error && <p role="alert">{error}</p>}
-    </>
-  );
-}
-
-function StoreLayout({ user }: { user: Manager }) {
+export function StoreWorkspaceApp({ user }: { user: Manager }) {
   const workspace = useQuery({
     queryKey: [...storeKey(user.id), 'workspace'],
     queryFn: () => api('/store/workspace', storeWorkspaceSchema),
@@ -360,7 +284,7 @@ function StoreContent({
             </section>
           )}
           <Routes>
-            <Route path="/store" element={<Outlet />}>
+            <Route path="/" element={<Outlet />}>
               <Route index element={<StoreDashboard search={search} />} />
               <Route path="orders/new" element={<PlaceOrder />} />
               <Route path="orders/:id/edit" element={<PlaceOrder />} />

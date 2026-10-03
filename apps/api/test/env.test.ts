@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadEnv } from '../src/config/env.ts';
+import { loadEnv, secureSessionCookies } from '../src/config/env.ts';
 
 const validEnv = {
   DATABASE_URL: 'postgres://waypoint:secret@localhost:5432/waypoint',
@@ -38,5 +38,19 @@ describe('loadEnv', () => {
 
   it('rejects a malformed DEMO_DATE', () => {
     expect(() => loadEnv({ ...validEnv, DEMO_DATE: '03/10/2026' })).toThrow(/DEMO_DATE/);
+  });
+});
+
+describe('session cookie deployment configuration', () => {
+  it('accepts explicit local HTTP while retaining Secure on production HTTPS', () => {
+    expect(secureSessionCookies({ DOMAIN: 'http://localhost' }, true)).toBe(false);
+    expect(secureSessionCookies({ DOMAIN: 'http://127.0.0.1:8080' }, true)).toBe(false);
+    expect(secureSessionCookies({ DOMAIN: 'waypoint.example.com' }, true)).toBe(true);
+    expect(secureSessionCookies({ DOMAIN: 'http://localhost.example.com' }, true)).toBe(true);
+    expect(secureSessionCookies({}, true)).toBe(true);
+    expect(secureSessionCookies({}, false)).toBe(false);
+    expect(secureSessionCookies({ SECURE_COOKIES: true, DOMAIN: 'http://localhost' }, true)).toBe(
+      true,
+    );
   });
 });

@@ -3,7 +3,7 @@ import { notifications } from '@waypoint/database';
 import type { EntityType, NotificationPriority, NotificationType } from '@waypoint/shared';
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 
-export type NotificationDb = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
+type NotificationDb = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
 
 export interface NotificationRow {
   id: string;

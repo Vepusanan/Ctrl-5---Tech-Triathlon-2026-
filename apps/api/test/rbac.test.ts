@@ -116,6 +116,71 @@ describe('RBAC', () => {
     expect(missing.json()).toEqual({ error: { code: 'NOT_FOUND', message: 'Order not found' } });
   });
 
+  it('enforces scope and mutations on the actual workspace endpoints', async () => {
+    const store = await login(app, fixture.emails.storeManager, fixture.password);
+    const driver = await login(app, fixture.emails.driver, fixture.password);
+    const loader = await login(app, fixture.emails.loader, fixture.password);
+    const dispatcher = await login(app, fixture.emails.dispatcher, fixture.password);
+    const own = await app.inject({
+      method: 'GET',
+      url: '/api/v1/store/workspace',
+      headers: { cookie: store },
+    });
+    expect(own.statusCode).toBe(200);
+    expect(
+      own
+        .json()
+        .orders.every((item: { order: { outletId: string } }) => item.order.outletId === 'OUT002'),
+    ).toBe(true);
+    for (const id of [fixture.orders.sibling, fixture.orders.otherDepot]) {
+      expect(
+        (
+          await app.inject({
+            method: 'GET',
+            url: `/api/v1/store/orders/${id}`,
+            headers: { cookie: store },
+          })
+        ).statusCode,
+      ).toBe(404);
+      expect(
+        (
+          await app.inject({
+            method: 'GET',
+            url: `/api/v1/orders/${id}`,
+            headers: { cookie: store },
+          })
+        ).statusCode,
+      ).toBe(404);
+    }
+    const filtered = await app.inject({
+      method: 'GET',
+      url: '/api/v1/orders?outletId=OUT011',
+      headers: { cookie: store },
+    });
+    expect(filtered.json().items).toEqual([]);
+    const depart = await app.inject({
+      method: 'POST',
+      url: `/api/v1/trips/${fixture.trips.otherDepot}/depart`,
+      headers: { cookie: driver, 'if-match': '1' },
+    });
+    expect(depart.statusCode).toBe(404);
+    const planning = await app.inject({
+      method: 'POST',
+      url: '/api/v1/planning/runs/2026-10-03/auto-allocate',
+      headers: { cookie: loader, 'if-match': '1' },
+    });
+    expect(planning.statusCode).toBe(403);
+    expect(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/api/v1/store/workspace',
+          headers: { cookie: dispatcher },
+        })
+      ).statusCode,
+    ).toBe(403);
+  });
+
   it('hides trips outside the caller scope with 404', async () => {
     const driver = await login(app, fixture.emails.driver, fixture.password);
     const loader = await login(app, fixture.emails.loader, fixture.password);

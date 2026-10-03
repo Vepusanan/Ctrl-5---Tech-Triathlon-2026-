@@ -21,6 +21,7 @@ export * from './entities/user.ts';
 export * from './enums.ts';
 export * from './errors.ts';
 export * from './health.ts';
+export { can, getHomeRoute } from './permissions.ts';
 export * from './planning.ts';
 export * from './primitives.ts';
 export * from './state-machines.ts';

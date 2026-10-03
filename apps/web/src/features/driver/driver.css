@@ -1,0 +1,37 @@
+.driver-workspace {
+  max-width: 900px;
+  margin: auto;
+  padding: 16px;
+}
+.driver-workspace header,
+.driver-workspace nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.driver-workspace header > strong {
+  flex: 1;
+}
+.driver-workspace nav a,
+.driver-workspace main > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px;
+}
+.driver-workspace .wp-card {
+  margin-block: 16px;
+}
+.driver-workspace canvas {
+  background: white;
+  border-radius: 8px;
+}
+.driver-workspace h1 {
+  font-size: 26px;
+}
+.driver-workspace input,
+.driver-workspace textarea {
+  max-width: 100%;
+}

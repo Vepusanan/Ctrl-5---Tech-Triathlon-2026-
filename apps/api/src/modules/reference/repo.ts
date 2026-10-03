@@ -18,7 +18,7 @@ import type {
 import { and, asc, eq, isNull, or, type SQL } from 'drizzle-orm';
 import { ApiError } from '../../plugins/errors.ts';
 
-export type ReferenceDb = Database;
+type ReferenceDb = Database;
 
 export interface OutletListFilter {
   depotId?: string;

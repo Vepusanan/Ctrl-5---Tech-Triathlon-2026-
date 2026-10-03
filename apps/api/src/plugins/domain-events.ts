@@ -57,7 +57,7 @@ export interface DeliveryDomainEvent {
   late: boolean;
 }
 
-export interface ReceiptConfirmedEvent {
+interface ReceiptConfirmedEvent {
   type: 'receipt.confirmed';
   actorId: string;
   occurredAt: string;
@@ -68,7 +68,7 @@ export interface ReceiptConfirmedEvent {
   depotId: string;
 }
 
-export interface IssueReportedEvent {
+interface IssueReportedEvent {
   type: 'issue.reported';
   actorId: string;
   occurredAt: string;

@@ -1,9 +1,15 @@
 import { expect, test } from '@playwright/test';
 
-test('web app renders and reports system status', async ({ page }) => {
+test('anonymous home opens the shared login', async ({ page }) => {
+  await page.route('**/api/v1/auth/me', (route) =>
+    route.fulfill({
+      status: 401,
+      json: { error: { code: 'UNAUTHENTICATED', message: 'Sign in required' } },
+    }),
+  );
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1, name: 'Waypoint' })).toBeVisible();
-
-  const status = page.getByRole('region', { name: 'System status' }).getByRole('status');
-  await expect(status).not.toHaveText('Checking…');
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('heading', { name: 'Sign in to Waypoint' })).toBeVisible();
+  await expect(page.getByLabel('Email')).toBeVisible();
+  await expect(page.getByLabel('Password')).toBeVisible();
 });
