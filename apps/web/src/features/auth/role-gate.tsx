@@ -1,10 +1,25 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { currentUserResponseSchema, type Role, type User } from '@waypoint/shared';
+import {
+  type CurrentUserResponse,
+  currentUserResponseSchema,
+  type Role,
+  type User,
+} from '@waypoint/shared';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Button, ErrorState, LoadingState } from '../../components/waypoint';
 import { api, HttpError, message, noContent } from '../../lib/api';
 import { replaceSession } from '../../lib/session';
 import '../store/store.css';
+
+/**
+ * Where a workspace that must open offline keeps the last confirmed session (the driver,
+ * SYSTEM_DESIGN §10.3). It is only read when the server cannot be reached; a 401 clears it.
+ */
+export interface OfflineSession {
+  read: () => Promise<CurrentUserResponse | undefined>;
+  save: (session: CurrentUserResponse) => Promise<void>;
+  clear: () => Promise<void>;
+}
 
 // Session check, sign-in and role check for a workspace route. It uses the same session
 // query and endpoints as the Store and Dispatcher workspaces. The server still enforces
@@ -13,24 +28,46 @@ export function RoleGate<R extends Role>({
   requiredRole,
   title,
   description,
+  offlineSession,
   children,
 }: {
   requiredRole: R;
   title: string;
   description: string;
+  offlineSession?: OfflineSession;
   children: (user: Extract<User, { role: R }>) => ReactNode;
 }) {
   const client = useQueryClient();
   const session = useQuery({
     queryKey: ['session'],
-    queryFn: () => api('/auth/me', currentUserResponseSchema),
+    queryFn: async () => {
+      try {
+        const me = await api('/auth/me', currentUserResponseSchema);
+        await offlineSession?.save(me);
+        return me;
+      } catch (cause) {
+        if (offlineSession && cause instanceof HttpError) {
+          if (cause.status === 401) await offlineSession.clear();
+          if (cause.status === 0) {
+            const cached = await offlineSession.read();
+            if (cached) return cached;
+          }
+        }
+        throw cause;
+      }
+    },
     retry: false,
+    // An offline-capable workspace still runs the check without a network, to reach the cache.
+    networkMode: offlineSession ? 'always' : 'online',
   });
   useEffect(() => {
-    const expired = () => client.setQueryData(['session'], null);
+    const expired = () => {
+      client.setQueryData(['session'], null);
+      void offlineSession?.clear();
+    };
     window.addEventListener('waypoint:unauthenticated', expired);
     return () => window.removeEventListener('waypoint:unauthenticated', expired);
-  }, [client]);
+  }, [client, offlineSession]);
   if (session.isPending) {
     return (
       <main className="store-signin">
@@ -126,7 +163,14 @@ function SignIn({ title, description }: { title: string; description: string }) 
   );
 }
 
-export function SignOut() {
+export function SignOut({
+  disabled = false,
+  offlineSession,
+}: {
+  disabled?: boolean;
+  /** Forgotten before the server session ends, so an offline reload cannot reopen the app. */
+  offlineSession?: OfflineSession;
+} = {}) {
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -135,10 +179,12 @@ export function SignOut() {
       <Button
         variant="tertiary"
         busy={busy}
+        disabled={disabled}
         onClick={async () => {
           setBusy(true);
           setError('');
           try {
+            await offlineSession?.clear();
             await api('/auth/logout', noContent, { method: 'POST' });
             replaceSession(client, null);
           } catch (cause) {

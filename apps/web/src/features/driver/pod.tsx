@@ -4,12 +4,11 @@ import { Button } from '../../components/waypoint';
 import { api, HttpError } from '../../lib/api';
 import { DriverIcon, ThumbZone } from './shell';
 import { SignatureField, type SignatureHandle } from './signature';
-import { useDriver } from './workspace';
 
-// SYSTEM_DESIGN §9.4: each image must be under 2 MB. Photos above PHOTO_TARGET are re-encoded.
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
-const PHOTO_TARGET = 900 * 1024;
-const PHOTO_EDGE = 1600;
+// SYSTEM_DESIGN §8.1: the POD waits on the phone compressed to 300 KB or less, well inside the
+// API's 2 MB image limit (§9.4). Larger photos are re-encoded, with smaller edges if needed.
+const PHOTO_TARGET = 300 * 1024;
+const PHOTO_EDGES = [1600, 1280, 960];
 const RECIPIENT_MAX = 120;
 
 /**
@@ -32,7 +31,14 @@ export async function ensurePod(stopId: string, build: () => Promise<FormData>):
   }
 }
 
-// DR04. Recipient, signature and an optional photo, then the caller sends the delivered event.
+/** What the driver captured; the outbox uploads it when there is signal (§8.2). */
+export interface PodDraft {
+  recipientName: string;
+  signature: Blob;
+  photo?: Blob;
+}
+
+// DR04. Recipient, signature and an optional photo, then the caller records the delivery.
 // The form is display: contents so its thumb zone sits at the foot of the screen.
 export function DeliveryForm({
   stop,
@@ -41,9 +47,8 @@ export function DeliveryForm({
 }: {
   stop: DeliveryStop;
   busy: boolean;
-  onSubmit: (build: () => Promise<FormData>) => void;
+  onSubmit: (pod: PodDraft) => void;
 }) {
-  const { stamp } = useDriver();
   const signature = useRef<SignatureHandle>(null);
   const [recipient, setRecipient] = useState('');
   const [unsigned, setUnsigned] = useState(true);
@@ -57,19 +62,12 @@ export function DeliveryForm({
     <form
       className="driver-form"
       aria-label="Proof of delivery"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
-        if (!ready) return;
-        onSubmit(async () => {
-          const pad = signature.current;
-          if (!pad || pad.isEmpty()) throw new Error('Ask the recipient to sign first.');
-          const form = new FormData();
-          form.append('recipientName', name);
-          form.append('clientTime', stamp());
-          form.append('signature', await pad.toPng(), 'signature.png');
-          if (photo) form.append('photo', photo, 'photo.jpg');
-          return form;
-        });
+        const pad = signature.current;
+        if (!ready || !pad || pad.isEmpty()) return;
+        const signed = await pad.toPng();
+        onSubmit({ recipientName: name, signature: signed, ...(photo ? { photo } : {}) });
       }}
     >
       <label className="driver-field">
@@ -164,24 +162,29 @@ export function DeliveryForm({
   );
 }
 
-// Re-encodes a camera photo as JPEG no larger than PHOTO_EDGE px so it stays under the API limit.
+// Re-encodes a camera photo as JPEG, shrinking the edge and quality until it fits PHOTO_TARGET.
 async function preparePhoto(file: File): Promise<Blob> {
   if (!file.type.startsWith('image/')) throw new Error('Choose an image file.');
   const plain = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
   if (plain && file.size <= PHOTO_TARGET) return file;
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) throw new Error('This photo format cannot be read. Try another photo.');
-  const scale = Math.min(1, PHOTO_EDGE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  for (const quality of [0.82, 0.7, 0.55]) {
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, 'image/jpeg', quality),
-    );
-    if (blob && blob.size <= MAX_IMAGE_BYTES) return blob;
+  try {
+    for (const edge of PHOTO_EDGES) {
+      const scale = Math.min(1, edge / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      for (const quality of [0.8, 0.65, 0.5]) {
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, 'image/jpeg', quality),
+        );
+        if (blob && blob.size <= PHOTO_TARGET) return blob;
+      }
+    }
+  } finally {
+    bitmap.close();
   }
   throw new Error('The photo is too large even after compression. Try another photo.');
 }

@@ -3,6 +3,7 @@ import { operatingClockSchema } from '@waypoint/shared';
 import { useRef } from 'react';
 import { api, HttpError } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
+import { cachedClock, saveClock } from './offline/store';
 
 // Asia/Colombo has no daylight-saving shift, so +05:30 is the whole zone rule.
 const COLOMBO_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
@@ -20,15 +21,24 @@ interface Reading {
 }
 
 // GET /admin/clock exists only in DEMO_MODE. Without it the server follows the host clock.
-async function readClock(): Promise<Reading> {
+// The last reading is kept on the phone: offline, the device clock advances from that anchor.
+async function readClock(userId: string): Promise<Reading> {
   const sentAt = Date.now();
   try {
     const clock = await api('/admin/clock', operatingClockSchema);
     const receivedAt = Date.now();
-    return { serverNow: Date.parse(clock.now), deviceAt: (sentAt + receivedAt) / 2 };
+    const reading = { serverNow: Date.parse(clock.now), deviceAt: (sentAt + receivedAt) / 2 };
+    await saveClock(userId, reading);
+    return reading;
   } catch (cause) {
     if (cause instanceof HttpError && cause.status === 404) {
-      return { serverNow: null, deviceAt: sentAt };
+      const reading = { serverNow: null, deviceAt: sentAt };
+      await saveClock(userId, reading);
+      return reading;
+    }
+    if (cause instanceof HttpError && cause.status === 0) {
+      const cached = await cachedClock(userId);
+      if (cached) return cached;
     }
     throw cause;
   }
@@ -44,7 +54,8 @@ async function readClock(): Promise<Reading> {
 export function useDriverClock(userId: string) {
   const query = useQuery({
     queryKey: queryKeys.driver.clock(userId),
-    queryFn: readClock,
+    queryFn: () => readClock(userId),
+    networkMode: 'always',
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,

@@ -173,6 +173,57 @@
   line-height: 15px;
 }
 
+/* Online with events still on the phone (links to the Sync tab). */
+.driver-syncing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--driver-target);
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-nested);
+  background: var(--color-status-warning-subtle);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  text-decoration: none;
+}
+
+.driver-syncing:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* A stop with events not yet on the server (DR02 card footnote). */
+.driver-stop-sync {
+  color: var(--color-status-warning);
+}
+
+.driver-stop-sync--conflict {
+  color: var(--color-status-danger);
+}
+
+/* DR05b Sync center summary. */
+.driver-sync-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+}
+
+.driver-sync-ring {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border: 6px solid var(--color-status-warning);
+  border-radius: var(--radius-pill);
+}
+
+.driver-sync-ring--clear {
+  border-color: var(--color-status-success);
+}
+
 /* Cards. */
 .driver-card {
   display: grid;
@@ -678,6 +729,25 @@ a.driver-card:focus-visible,
 
 .driver-tab--active {
   color: var(--color-text-primary);
+}
+
+.driver-tab {
+  position: relative;
+}
+
+.driver-tab-count {
+  position: absolute;
+  top: 2px;
+  left: calc(50% + 6px);
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-warning);
+  color: var(--color-text-inverse);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
 }
 
 .driver-tab:focus-visible {

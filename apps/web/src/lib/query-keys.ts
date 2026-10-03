@@ -7,6 +7,7 @@ export const queryKeys = {
     trips: (userId: string) => ['driver', userId, 'trips'] as const,
     trip: (userId: string, tripId: string) => ['driver', userId, 'trip', tripId] as const,
     stop: (userId: string, stopId: string) => ['driver', userId, 'stop', stopId] as const,
+    route: (userId: string, tripId: string) => ['driver', userId, 'route', tripId] as const,
     outlets: (userId: string) => ['driver', userId, 'outlets'] as const,
     notifications: (userId: string) => ['driver', userId, 'notifications'] as const,
   },

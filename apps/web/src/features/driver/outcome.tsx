@@ -1,17 +1,16 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { deliveryStopSchema } from '@waypoint/shared';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Button, ErrorState, LoadingState } from '../../components/waypoint';
-import { api, message } from '../../lib/api';
+import { message } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { time } from '../store/shared';
-import { useDriverRefresh, useSendStopEvent } from './actions';
 import { FAILURE_REASONS, reasonIcon } from './labels';
-import { DeliveryForm, ensurePod } from './pod';
+import { loadStop } from './offline/queries';
+import { DeliveryForm } from './pod';
 import { DriverHeader, DriverIcon, Strip, ThumbZone } from './shell';
 import { useDriverOutlets } from './trip';
-import { useDriver } from './workspace';
+import { type StopAction, useDriver } from './workspace';
 
 type Outcome = 'delivered' | 'failed';
 
@@ -25,28 +24,22 @@ const minutes = (clock: string) => {
 // outcome the API records, so the control offers the two it does.
 export function StopOutcome() {
   const { stopId = '' } = useParams();
-  const { user, online, eventFor, stamp } = useDriver();
+  const { user, record, stamp } = useDriver();
   const navigate = useNavigate();
-  const refresh = useDriverRefresh();
-  const send = useSendStopEvent();
   const [outcome, setOutcome] = useState<Outcome>('delivered');
   const [reason, setReason] = useState('');
   const stop = useQuery({
     queryKey: queryKeys.driver.stop(user.id, stopId),
-    queryFn: () => api(`/stops/${stopId}`, deliveryStopSchema),
+    queryFn: () => loadStop(user.id, stopId),
+    networkMode: 'always',
   });
   const outlets = useDriverOutlets(user.id);
-  // A failed attempt keeps its event, so pressing the same button again replays it unchanged.
+  // Saved on the phone first; the outbox uploads the POD and sends the event (§8.2).
   const action = useMutation({
-    mutationFn: (run: () => Promise<void>) => run(),
+    mutationFn: (run: StopAction) => record(run),
     onSuccess: () => navigate(`/driver/stops/${stopId}`, { replace: true }),
-    onSettled: refresh,
+    networkMode: 'always',
   });
-  const status = stop.data?.status;
-  const { reset } = action;
-  useEffect(() => {
-    if (status !== undefined) reset();
-  }, [status, reset]);
 
   if (stop.isPending) return <LoadingState label="Loading the stop…" />;
   if (!stop.data) {
@@ -57,19 +50,6 @@ export function StopOutcome() {
   if (detail.status !== 'arrived') return <Navigate to={`/driver/stops/${detail.id}`} replace />;
   const outlet = outlets.data?.items.find((item) => item.id === detail.order.outletId);
   const busy = action.isPending;
-  const base = { stopId: detail.id, tripVersion: detail.tripVersion };
-
-  // POD first, then the event that references it. A POD already on the stop is reused, so a
-  // delivered event that failed after the upload never asks for a second signature.
-  const deliver = (build: () => Promise<FormData>) =>
-    action.mutate(async () => {
-      const podId = detail.pod?.id ?? (await ensurePod(detail.id, build));
-      await send(eventFor({ ...base, type: 'delivered', payload: { podId } }));
-    });
-  const completeWithSavedPod = (podId: string) =>
-    action.mutate(() => send(eventFor({ ...base, type: 'delivered', payload: { podId } })));
-  const fail = () =>
-    action.mutate(() => send(eventFor({ ...base, type: 'failed', payload: { reason } })));
 
   const now = time(stamp());
   const close = detail.windowClose.slice(0, 5);
@@ -107,11 +87,8 @@ export function StopOutcome() {
 
       {action.error && (
         <div className="driver-banner driver-banner--danger" role="alert">
-          <strong>Not saved</strong>
+          <strong>Not saved on this phone</strong>
           <p>{message(action.error)}</p>
-          <p className="wp-muted">
-            Press the same button again to retry. It will not be recorded twice.
-          </p>
         </div>
       )}
 
@@ -125,8 +102,10 @@ export function StopOutcome() {
             <Button
               className="driver-cta"
               busy={busy}
-              disabled={!online}
-              onClick={() => detail.pod && completeWithSavedPod(detail.pod.id)}
+              onClick={() =>
+                detail.pod &&
+                action.mutate({ stop: detail, type: 'delivered', podId: detail.pod.id })
+              }
             >
               Complete delivery
             </Button>
@@ -135,7 +114,11 @@ export function StopOutcome() {
       )}
       {/* Once a POD is saved the form is not shown again, so the driver never re-signs. */}
       {outcome === 'delivered' && !detail.pod && (
-        <DeliveryForm stop={detail} busy={busy || !online} onSubmit={deliver} />
+        <DeliveryForm
+          stop={detail}
+          busy={busy}
+          onSubmit={(pod) => action.mutate({ stop: detail, type: 'delivered', pod })}
+        />
       )}
 
       {outcome === 'failed' && (
@@ -144,7 +127,7 @@ export function StopOutcome() {
           aria-label="Failed delivery"
           onSubmit={(event) => {
             event.preventDefault();
-            if (reason) fail();
+            if (reason) action.mutate({ stop: detail, type: 'failed', reason });
           }}
         >
           <fieldset className="driver-reasons">
@@ -180,7 +163,7 @@ export function StopOutcome() {
             No proof of delivery for a failed stop. Goods return to the depot.
           </Strip>
           <ThumbZone>
-            <Button type="submit" className="driver-cta" busy={busy} disabled={!reason || !online}>
+            <Button type="submit" className="driver-cta" busy={busy} disabled={!reason}>
               Record failed delivery
             </Button>
           </ThumbZone>

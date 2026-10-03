@@ -1,15 +1,19 @@
-import { type StopEventInput, stopEventInputSchema, type User } from '@waypoint/shared';
+import type { DeliveryStop, User } from '@waypoint/shared';
 import { createContext, useContext, useEffect, useRef } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ErrorState, LoadingState } from '../../components/waypoint';
 import { message } from '../../lib/api';
-import { RoleGate } from '../auth/role-gate';
+import { type OfflineSession, RoleGate } from '../auth/role-gate';
 import { useOnline } from '../store/shared';
 import { DriverAccount } from './account';
 import { colomboTimestamp, useDriverClock } from './clock';
 import { NoticeDetail, Notices } from './notices';
+import { type SyncState, useSyncEngine } from './offline/engine';
+import { cachedSession, clearSession, enqueue, saveSession, stopEntries } from './offline/store';
+import { localStopStatus } from './offline/sync-core';
+import type { OutboxEntry, PodBlob } from './offline/types';
 import { StopOutcome } from './outcome';
-import { DriverTabBar, OFFLINE_ICON, OfflineBar } from './shell';
+import { DriverTabBar, OFFLINE_ICON, OfflineBar, SyncingBar } from './shell';
 import { StopDetail } from './stop';
 import { DriverSync } from './sync';
 import { TripOverview } from './trip';
@@ -18,25 +22,30 @@ import './driver.css';
 
 type Driver = Extract<User, { role: 'driver' }>;
 
-// An event without its identity and time, which the workspace adds once per user action.
-type EventDraft = StopEventInput extends infer Event
-  ? Event extends StopEventInput
-    ? Omit<Event, 'clientEventId' | 'clientTime'>
-    : never
-  : never;
+/** One stop outcome as the driver records it, before it reaches the server. */
+export type StopAction =
+  | { stop: DeliveryStop; type: 'arrived' }
+  | { stop: DeliveryStop; type: 'failed'; reason: string }
+  | { stop: DeliveryStop; type: 'delivered'; podId: string }
+  | {
+      stop: DeliveryStop;
+      type: 'delivered';
+      pod: { recipientName: string; signature: Blob; photo?: Blob };
+    };
 
 interface DriverContextValue {
   user: Driver;
   online: boolean;
   /** The operating-clock time now, as an ISO timestamp with +05:30. */
   stamp: () => string;
+  /** A device time (ms) on the operating clock, for times the phone itself keeps. */
+  clockAt: (deviceMs: number) => string;
   /**
-   * The event for one user action. A retry of the same action gets the same client event id
-   * and the same content, so the API replays it instead of recording a second event.
+   * Records a stop outcome locally first (SYSTEM_DESIGN §8.2): IndexedDB, then the screens,
+   * then the outbox sends it with its own client event id. Online and offline take this path.
    */
-  eventFor: (draft: EventDraft) => StopEventInput;
-  /** Forgets an action once the API has recorded it. */
-  settle: (event: StopEventInput) => void;
+  record: (action: StopAction) => Promise<void>;
+  sync: SyncState;
 }
 
 const DriverContext = createContext<DriverContextValue | null>(null);
@@ -47,12 +56,28 @@ export function useDriver() {
   return value;
 }
 
+/** Whether this stop has events still on the phone, and whether the server refused one. */
+export function useStopSync(stopId: string) {
+  const { sync } = useDriver();
+  const entries = sync.entries.filter((entry) => entry.stopId === stopId);
+  const local = localStopStatus('pending', entries);
+  return { entries, pending: local.pending, conflict: local.conflict };
+}
+
+// The driver reopens the app with no signal, so the last confirmed session is kept on the phone.
+export const driverSession: OfflineSession = {
+  read: cachedSession,
+  save: saveSession,
+  clear: clearSession,
+};
+
 export function DriverWorkspaceApp() {
   return (
     <RoleGate
       requiredRole="driver"
       title="Driver"
       description="Your trips, stops and proof of delivery."
+      offlineSession={driverSession}
     >
       {(user) => <DriverLayout user={user} />}
     </RoleGate>
@@ -63,7 +88,7 @@ function DriverLayout({ user }: { user: Driver }) {
   const online = useOnline();
   const location = useLocation();
   const clock = useDriverClock(user.id);
-  const pending = useRef(new Map<string, StopEventInput>());
+  const sync = useSyncEngine(user.id, online);
   // Fetch the offline bar's icon while online; once the connection drops it cannot be loaded.
   const offlineIcon = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
@@ -90,38 +115,61 @@ function DriverLayout({ user }: { user: Driver }) {
     );
   }
   const offset = clock.offset;
-  const stamp = () => colomboTimestamp(Date.now() + offset);
-  const eventFor = (draft: EventDraft): StopEventInput => {
-    const key = `${draft.stopId}:${draft.type}`;
-    const earlier = pending.current.get(key);
-    if (
-      earlier !== undefined &&
-      earlier.tripVersion === draft.tripVersion &&
-      JSON.stringify(earlier.payload) === JSON.stringify(draft.payload)
-    ) {
-      return earlier;
-    }
-    const event = stopEventInputSchema.parse({
-      ...draft,
+  const clockAt = (deviceMs: number) => colomboTimestamp(deviceMs + offset);
+  const stamp = () => clockAt(Date.now());
+  const lastSync = sync.lastSyncAt === null ? null : clockAt(sync.lastSyncAt);
+  const record = async (action: StopAction) => {
+    const { stop } = action;
+    // A second tap on the same outcome while the first is still on the phone is the same action.
+    const earlier = await stopEntries(user.id, stop.id);
+    if (earlier.some((entry) => entry.type === action.type && entry.status !== 'conflict')) return;
+    const clientTime = stamp();
+    const entry: OutboxEntry = {
       clientEventId: newEventId(),
-      clientTime: stamp(),
-    });
-    pending.current.set(key, event);
-    return event;
-  };
-  const settle = (event: StopEventInput) => {
-    pending.current.delete(`${event.stopId}:${event.type}`);
+      userId: user.id,
+      tripId: stop.tripId,
+      stopId: stop.id,
+      outletId: stop.order.outletId,
+      type: action.type,
+      clientTime,
+      tripVersion: stop.tripVersion,
+      status: 'queued',
+      attempts: 0,
+      nextAttemptAt: 0,
+      createdAt: Date.now(),
+    };
+    let pod: PodBlob | undefined;
+    if (action.type === 'failed') entry.reason = action.reason;
+    if (action.type === 'delivered' && 'podId' in action) entry.podId = action.podId;
+    if (action.type === 'delivered' && 'pod' in action) {
+      pod = {
+        id: newEventId(),
+        userId: user.id,
+        stopId: stop.id,
+        recipientName: action.pod.recipientName,
+        clientTime,
+        signature: action.pod.signature,
+        ...(action.pod.photo ? { photo: action.pod.photo } : {}),
+      };
+      entry.blobId = pod.id;
+      entry.recipientName = action.pod.recipientName;
+    }
+    await enqueue(entry, pod);
+    void sync.syncNow();
   };
   // Stop and outcome screens are focus screens without the tab bar (Figma DR03, DR04, DR04a).
   const focus = location.pathname.startsWith('/driver/stops/');
   return (
-    <DriverContext.Provider value={{ user, online, stamp, eventFor, settle }}>
+    <DriverContext.Provider value={{ user, online, stamp, clockAt, record, sync }}>
       <div className={`driver-app${focus ? ' driver-app--focus' : ''}`}>
         <a href="#main-content" className="wp-skip">
           Skip to content
         </a>
         <main className="driver-main" id="main-content" tabIndex={-1}>
-          {!online && <OfflineBar />}
+          {!online && <OfflineBar pending={sync.pending} lastSyncAt={lastSync} />}
+          {online && sync.pending + sync.conflicts > 0 && (
+            <SyncingBar pending={sync.pending} conflicts={sync.conflicts} />
+          )}
           <Routes>
             <Route path="/driver" element={<MyTrips />} />
             <Route path="/driver/trips/:tripId" element={<TripOverview />} />
@@ -134,7 +182,7 @@ function DriverLayout({ user }: { user: Driver }) {
             <Route path="*" element={<Navigate to="/driver" replace />} />
           </Routes>
         </main>
-        {!focus && <DriverTabBar pathname={location.pathname} />}
+        {!focus && <DriverTabBar pathname={location.pathname} pending={sync.pending} />}
       </div>
     </DriverContext.Provider>
   );

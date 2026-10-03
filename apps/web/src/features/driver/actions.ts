@@ -1,10 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  type StopEventInput,
-  stopEventSchema,
-  type TripDetail,
-  tripDetailSchema,
-} from '@waypoint/shared';
+import { type TripDetail, tripDetailSchema } from '@waypoint/shared';
 import { api, HttpError } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { useDriver } from './workspace';
@@ -29,19 +24,4 @@ export function useDepart() {
   });
   const stale = depart.error instanceof HttpError && depart.error.code === 'VERSION_CONFLICT';
   return { depart, stale };
-}
-
-/**
- * Sends one stop event and forgets it once recorded. The event comes from eventFor, so pressing
- * the same button after a failure replays the same client event id instead of recording twice.
- */
-export function useSendStopEvent() {
-  const { settle } = useDriver();
-  return async (event: StopEventInput) => {
-    await api(`/stops/${event.stopId}/events`, stopEventSchema, {
-      method: 'POST',
-      body: JSON.stringify(event),
-    });
-    settle(event);
-  };
 }

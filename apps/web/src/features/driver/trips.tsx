@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { type TripDetail, tripListResponseSchema } from '@waypoint/shared';
+import type { TripDetail } from '@waypoint/shared';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -8,11 +8,12 @@ import {
   LoadingState,
   StatusBadge,
 } from '../../components/waypoint';
-import { api, message } from '../../lib/api';
+import { message } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { day, initials } from '../store/shared';
 import { useDepart } from './actions';
 import { tripBadge } from './labels';
+import { loadTrips } from './offline/queries';
 import { DriverHeader, DriverIcon, Strip, ThumbZone } from './shell';
 import { DepartError } from './trip';
 import { useDriver } from './workspace';
@@ -25,7 +26,8 @@ export function MyTrips() {
   const { depart, stale } = useDepart();
   const trips = useQuery({
     queryKey: queryKeys.driver.trips(user.id),
-    queryFn: () => api('/trips', tripListResponseSchema),
+    queryFn: () => loadTrips(user.id),
+    networkMode: 'always',
     refetchInterval: 30_000,
   });
   const now = stamp();

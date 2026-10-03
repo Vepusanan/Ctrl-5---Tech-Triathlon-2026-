@@ -1,17 +1,17 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { deliveryStopSchema, type Outlet, tripDetailSchema } from '@waypoint/shared';
-import { useEffect } from 'react';
+import type { Outlet } from '@waypoint/shared';
 import { Link, useParams } from 'react-router-dom';
 import { Button, ErrorState, LoadingState, StatusBadge, Tag } from '../../components/waypoint';
-import { api, HttpError, message } from '../../lib/api';
+import { HttpError, message } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { issueTypeLabel } from '../loader/labels';
 import { orderName, time } from '../store/shared';
-import { useDriverRefresh, useSendStopEvent } from './actions';
 import { dockLabel, stopBadge } from './labels';
+import { loadStop, loadTrip } from './offline/queries';
+import type { OutboxEntry } from './offline/types';
 import { DriverHeader, DriverIcon, InverseCard, ListRow, Strip, ThumbZone } from './shell';
 import { useDriverOutlets } from './trip';
-import { useDriver } from './workspace';
+import { useDriver, useStopSync } from './workspace';
 
 const minutes = (clock: string) => {
   const [hours = 0, mins = 0] = clock.split(':').map(Number);
@@ -36,32 +36,29 @@ function pastWindow(eta: string, outlet: Outlet, late: boolean, pending: boolean
 // then the outcome screen (DR04) records delivered with POD or failed with a reason.
 export function StopDetail() {
   const { stopId = '' } = useParams();
-  const { user, online, eventFor } = useDriver();
-  const refresh = useDriverRefresh();
-  const send = useSendStopEvent();
+  const { user, record } = useDriver();
   const stop = useQuery({
     queryKey: queryKeys.driver.stop(user.id, stopId),
-    queryFn: () => api(`/stops/${stopId}`, deliveryStopSchema),
+    queryFn: () => loadStop(user.id, stopId),
+    networkMode: 'always',
   });
   const tripId = stop.data?.tripId ?? '';
   const trip = useQuery({
     queryKey: queryKeys.driver.trip(user.id, tripId),
-    queryFn: () => api(`/trips/${tripId}`, tripDetailSchema),
+    queryFn: () => loadTrip(user.id, tripId),
     enabled: tripId !== '',
+    networkMode: 'always',
   });
   const outlets = useDriverOutlets(user.id);
-  // A failed attempt keeps its event, so pressing the same button again replays it unchanged.
+  const local = useStopSync(stopId);
+  // Recorded on the phone first and sent by the outbox, with or without signal (§8.2).
   const arrive = useMutation({
-    mutationFn: (run: () => Promise<void>) => run(),
-    onSettled: refresh,
+    mutationFn: () => {
+      if (!stop.data) throw new Error('The stop is not loaded yet.');
+      return record({ stop: stop.data, type: 'arrived' });
+    },
+    networkMode: 'always',
   });
-  // If the response was lost but the API recorded the event, the refreshed status moves on.
-  // The earlier error no longer applies once it does.
-  const status = stop.data?.status;
-  const { reset } = arrive;
-  useEffect(() => {
-    if (status !== undefined) reset();
-  }, [status, reset]);
 
   if (stop.isPending) return <LoadingState label="Loading the stop…" />;
   if (!stop.data) {
@@ -89,17 +86,11 @@ export function StopDetail() {
     (issue) => issue.orderId === detail.order.id,
   );
   const place = outlet?.district ?? detail.order.outletId;
-  const recordArrival = () =>
-    arrive.mutate(() =>
-      send(
-        eventFor({
-          stopId: detail.id,
-          tripVersion: detail.tripVersion,
-          type: 'arrived',
-          payload: {},
-        }),
-      ),
-    );
+  const waiting = local.entries.filter(
+    (entry) => entry.status === 'queued' || entry.status === 'syncing',
+  );
+  const refused = local.entries.filter((entry) => entry.status === 'conflict').at(-1);
+  const deliveredLocally = waiting.find((entry) => entry.type === 'delivered');
 
   return (
     <>
@@ -179,12 +170,16 @@ export function StopDetail() {
 
       {arrive.error && (
         <div className="driver-banner driver-banner--danger" role="alert">
-          <strong>Not saved</strong>
+          <strong>Not saved on this phone</strong>
           <p>{message(arrive.error)}</p>
-          <p className="wp-muted">
-            Press the same button again to retry. It will not be recorded twice.
-          </p>
         </div>
+      )}
+      {refused && <RefusedBanner entry={refused} />}
+      {waiting.length > 0 && (
+        <Strip tone="neutral" icon={<DriverIcon name="clock" size={16} />}>
+          Saved on this phone at {time(waiting.at(-1)?.clientTime ?? '')}. It syncs automatically
+          when there is signal.
+        </Strip>
       )}
       {detail.status === 'arrived' && detail.late && (
         <Strip tone="warning" icon={<DriverIcon name="info-warning" size={16} />}>
@@ -200,12 +195,16 @@ export function StopDetail() {
       {detail.status === 'delivered' && (
         <div className="driver-banner driver-banner--success" role="status">
           <strong>Delivered{detail.late ? ' · late' : ''}</strong>
-          {detail.pod && (
+          {detail.pod ? (
             <p>
               Received by {detail.pod.recipientName} at {time(detail.pod.clientTime)}
               {detail.pod.hasPhoto ? ' · photo attached' : ''}
             </p>
-          )}
+          ) : deliveredLocally?.recipientName ? (
+            <p>
+              Received by {deliveredLocally.recipientName} at {time(deliveredLocally.clientTime)}
+            </p>
+          ) : null}
         </div>
       )}
       {detail.status === 'failed' && (
@@ -217,12 +216,7 @@ export function StopDetail() {
 
       <ThumbZone>
         {detail.status === 'pending' && (
-          <Button
-            className="driver-cta"
-            busy={arrive.isPending}
-            disabled={!online}
-            onClick={recordArrival}
-          >
+          <Button className="driver-cta" busy={arrive.isPending} onClick={() => arrive.mutate()}>
             I've arrived
           </Button>
         )}
@@ -247,5 +241,24 @@ export function StopDetail() {
           ))}
       </ThumbZone>
     </>
+  );
+}
+
+export const eventLabel: Record<OutboxEntry['type'], string> = {
+  arrived: 'Arrival',
+  delivered: 'Delivery',
+  failed: 'Failed delivery',
+};
+
+/** A refused event stays visible with the server's reason; it is never resolved silently. */
+function RefusedBanner({ entry }: { entry: OutboxEntry }) {
+  return (
+    <div className="driver-banner driver-banner--danger" role="alert">
+      <strong>{eventLabel[entry.type]} not accepted</strong>
+      <p>{entry.detail ?? 'The server refused this event.'}</p>
+      <p>
+        <Link to="/driver/sync">Open Sync</Link> for details, or contact the dispatcher.
+      </p>
+    </div>
   );
 }

@@ -4,8 +4,6 @@ import {
   type NotificationType,
   notificationFeedItemSchema,
   notificationListResponseSchema,
-  tripDetailSchema,
-  tripListResponseSchema,
 } from '@waypoint/shared';
 import { Link, useParams } from 'react-router-dom';
 import { Button, EmptyState, ErrorState, LoadingState } from '../../components/waypoint';
@@ -14,6 +12,7 @@ import { queryKeys } from '../../lib/query-keys';
 import { issueTypeLabel } from '../loader/labels';
 import { day, time } from '../store/shared';
 import { useDriverRefresh } from './actions';
+import { loadTrip, loadTrips } from './offline/queries';
 import { DriverHeader, DriverIcon, InverseCard, ListRow, ThumbZone } from './shell';
 import { useDriver } from './workspace';
 
@@ -36,6 +35,8 @@ function useNotices() {
     queryKey: queryKeys.driver.notifications(user.id),
     queryFn: () => api('/notifications', notificationListResponseSchema),
     refetchInterval: 30_000,
+    // Notices are not kept on the phone; offline shows the error rather than waiting forever.
+    networkMode: 'always',
   });
 }
 
@@ -46,7 +47,8 @@ export function Notices() {
   // Same query as My trips, so a trip notice can name its trip without another request.
   const trips = useQuery({
     queryKey: queryKeys.driver.trips(user.id),
-    queryFn: () => api('/trips', tripListResponseSchema),
+    queryFn: () => loadTrips(user.id),
+    networkMode: 'always',
   });
   const tripLabel = new Map(
     (trips.data?.items ?? []).map((trip) => [
@@ -153,8 +155,9 @@ export function NoticeDetail() {
   const tripId = notice?.entityType === 'trip' ? notice.entityId : '';
   const trip = useQuery({
     queryKey: queryKeys.driver.trip(user.id, tripId),
-    queryFn: () => api(`/trips/${tripId}`, tripDetailSchema),
+    queryFn: () => loadTrip(user.id, tripId),
     enabled: tripId !== '',
+    networkMode: 'always',
   });
   const acknowledge = useMutation({
     mutationFn: (id: string) =>

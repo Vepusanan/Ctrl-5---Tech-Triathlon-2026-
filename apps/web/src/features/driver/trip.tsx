@@ -1,27 +1,23 @@
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
-import {
-  type DeliveryStop,
-  deliveryStopSchema,
-  type Outlet,
-  outletListResponseSchema,
-  type TripStopDetail,
-  tripDetailSchema,
-} from '@waypoint/shared';
+import type { DeliveryStop, Outlet, SyncTripChanged, TripStopDetail } from '@waypoint/shared';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button, ErrorState, LoadingState, StatusBadge } from '../../components/waypoint';
-import { api, message } from '../../lib/api';
+import { message } from '../../lib/api';
 import { queryKeys } from '../../lib/query-keys';
 import { day, time } from '../store/shared';
-import { useDepart, useDriverRefresh, useSendStopEvent } from './actions';
+import { useDepart } from './actions';
 import { percent, stopBadge, stopTitle, tripBadge, windowRange } from './labels';
+import { loadOutlets, loadStop, loadTrip } from './offline/queries';
+import { cachedTrip, setRouteChange } from './offline/store';
 import { DriverHeader, DriverIcon, Strip, ThumbZone } from './shell';
-import { useDriver } from './workspace';
+import { useDriver, useStopSync } from './workspace';
 
 export function useDriverOutlets(userId: string) {
   return useQuery({
     queryKey: queryKeys.driver.outlets(userId),
-    queryFn: () => api('/outlets', outletListResponseSchema),
+    queryFn: () => loadOutlets(userId),
     staleTime: 5 * 60_000,
+    networkMode: 'always',
   });
 }
 
@@ -53,37 +49,35 @@ export function DepartError({ error, stale }: { error: Error | null; stale: bool
 // driver-scoped /outlets, and the shifted ETA from /stops/:id, which opens only after departure.
 export function TripOverview() {
   const { tripId = '' } = useParams();
-  const { user, online, eventFor } = useDriver();
+  const { user, online, record } = useDriver();
   const navigate = useNavigate();
-  const refresh = useDriverRefresh();
-  const send = useSendStopEvent();
   const trip = useQuery({
     queryKey: queryKeys.driver.trip(user.id, tripId),
-    queryFn: () => api(`/trips/${tripId}`, tripDetailSchema),
+    queryFn: () => loadTrip(user.id, tripId),
     refetchInterval: 30_000,
+    networkMode: 'always',
   });
   const outlets = useDriverOutlets(user.id);
   const departed = trip.data?.status === 'departed';
+  // Reading every stop while online also keeps it on the phone for the rest of the trip.
   const stopDetails = useQueries({
     queries: (departed ? (trip.data?.stops ?? []) : []).map((stop) => ({
       queryKey: queryKeys.driver.stop(user.id, stop.id),
-      queryFn: () => api(`/stops/${stop.id}`, deliveryStopSchema),
+      queryFn: () => loadStop(user.id, stop.id),
+      networkMode: 'always' as const,
     })),
   });
+  const routeChange = useQuery({
+    queryKey: queryKeys.driver.route(user.id, tripId),
+    queryFn: async () => (await cachedTrip(user.id, tripId))?.routeChange ?? null,
+    networkMode: 'always',
+  });
   const { depart, stale } = useDepart();
-  // Same event path as the stop screen, so a retry replays the recorded arrival.
+  // Saved on the phone first, then sent by the outbox (§8.2), so arriving works without signal.
   const arrive = useMutation({
-    mutationFn: (stop: DeliveryStop) =>
-      send(
-        eventFor({
-          stopId: stop.id,
-          tripVersion: stop.tripVersion,
-          type: 'arrived',
-          payload: {},
-        }),
-      ),
+    mutationFn: (stop: DeliveryStop) => record({ stop, type: 'arrived' }),
     onSuccess: (_, stop) => navigate(`/driver/stops/${stop.id}`),
-    onSettled: refresh,
+    networkMode: 'always',
   });
 
   if (trip.isPending) return <LoadingState label="Loading the trip…" />;
@@ -140,14 +134,19 @@ export function TripOverview() {
         </div>
       </section>
 
+      {routeChange.data && (
+        <RouteChanged
+          change={routeChange.data}
+          onAcknowledge={() =>
+            void setRouteChange(user.id, tripId, null, routeChange.data?.version)
+          }
+        />
+      )}
       <DepartError error={depart.error} stale={stale} />
       {arrive.error && (
         <div className="driver-banner driver-banner--danger" role="alert">
-          <strong>Arrival not saved</strong>
+          <strong>Arrival not saved on this phone</strong>
           <p>{message(arrive.error)}</p>
-          <p className="wp-muted">
-            Press the same button again to retry. It will not be recorded twice.
-          </p>
         </div>
       )}
       {(detail.status === 'published' || detail.status === 'loading') && (
@@ -198,7 +197,7 @@ export function TripOverview() {
           <Button
             className="driver-cta"
             busy={arrive.isPending}
-            disabled={!online || !nextLive}
+            disabled={!nextLive}
             onClick={() => nextLive && arrive.mutate(nextLive)}
           >
             Arrive at {nextName}
@@ -232,6 +231,7 @@ function StopCard({
   const status = live?.status ?? stop.status;
   const badge = stopBadge(status, live?.late ?? false);
   const window = windowRange(outlet);
+  const local = useStopSync(stop.id);
   const marker =
     status === 'delivered' ? (
       <span className="driver-seq driver-seq--done">
@@ -268,6 +268,17 @@ function StopCard({
         <DriverIcon name="info" size={14} />
         <span>{stopNotes(outlet, stop.order.temp === 'chilled', stop.order.units)}</span>
       </p>
+      {local.conflict ? (
+        <p className="driver-stop-line driver-stop-sync driver-stop-sync--conflict">
+          <DriverIcon name="info" size={14} />
+          <span>Not accepted by the server · see Sync</span>
+        </p>
+      ) : local.pending ? (
+        <p className="driver-stop-line driver-stop-sync">
+          <DriverIcon name="clock" size={14} />
+          <span>Saved on this phone · waiting to sync</span>
+        </p>
+      ) : null}
     </>
   );
   const className = `driver-card driver-stop${next ? ' driver-stop--next' : ''}`;
@@ -277,5 +288,31 @@ function StopCard({
     </Link>
   ) : (
     <div className={className}>{body}</div>
+  );
+}
+
+/** §8.4: a published change reaches the driver as a notice they acknowledge, never silently. */
+function RouteChanged({
+  change,
+  onAcknowledge,
+}: {
+  change: SyncTripChanged;
+  onAcknowledge: () => void;
+}) {
+  const parts = [
+    change.added.length > 0 ? `${change.added.length} added` : null,
+    change.removed.length > 0 ? `${change.removed.length} removed` : null,
+    change.reordered.length > 0 ? `${change.reordered.length} moved` : null,
+  ].filter((part) => part !== null);
+  return (
+    <div className="driver-banner" role="alert">
+      <strong>
+        Route changed · v{change.since} to v{change.version}
+      </strong>
+      <p>The dispatcher changed this trip ({parts.join(', ')}). The stops below are the latest.</p>
+      <Button variant="secondary" onClick={onAcknowledge}>
+        Got it
+      </Button>
+    </div>
   );
 }

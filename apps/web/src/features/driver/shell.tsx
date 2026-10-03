@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { time } from '../store/shared';
 
 // Phone shell from Figma section C (DR01–DR08): an in-page nav bar, one primary action in the
 // thumb zone and a four-tab bar. Icons are the Figma exports in public/waypoint/driver.
@@ -91,16 +92,42 @@ export function ThumbZone({ children }: { children: ReactNode }) {
   return <div className="driver-thumb">{children}</div>;
 }
 
-/** Offline bar from the shell components. Recording still needs a connection until Phase 4. */
-export function OfflineBar() {
+const pendingLabel = (pending: number) =>
+  pending === 0 ? 'nothing waiting' : `${pending} waiting to sync`;
+
+/** The last sync as the driver reads it; `at` is an operating-clock timestamp. */
+export const syncTime = (at: string | null) =>
+  at === null ? 'not synced yet on this phone' : `last sync ${time(at)}`;
+
+/** Offline bar from the shell components: connectivity, pending count and the last sync. */
+export function OfflineBar({
+  pending,
+  lastSyncAt,
+}: {
+  pending: number;
+  lastSyncAt: string | null;
+}) {
   return (
     <div className="driver-offline" role="status">
       <DriverIcon name="wifi-off" size={20} />
       <div>
-        <p>Offline</p>
-        <small>Reconnect to start trips and record stops.</small>
+        <p>Offline · {pendingLabel(pending)}</p>
+        <small>Stops are saved on this phone · {syncTime(lastSyncAt)}</small>
       </div>
     </div>
+  );
+}
+
+/** Back online with events still on the phone; they go automatically, oldest first. */
+export function SyncingBar({ pending, conflicts }: { pending: number; conflicts: number }) {
+  return (
+    <Link className="driver-syncing" to="/driver/sync" role="status">
+      <DriverIcon name={conflicts > 0 ? 'info-warning' : 'clock'} size={16} />
+      <span>
+        {pending > 0 ? `Online · ${pendingLabel(pending)}` : 'Online'}
+        {conflicts > 0 ? ` · ${conflicts} not accepted` : ''}
+      </span>
+    </Link>
   );
 }
 
@@ -118,7 +145,7 @@ function tripActive(pathname: string) {
   );
 }
 
-export function DriverTabBar({ pathname }: { pathname: string }) {
+export function DriverTabBar({ pathname, pending }: { pathname: string; pending: number }) {
   return (
     <nav className="driver-tabs" aria-label="Driver">
       {tabs.map((tab) => {
@@ -135,6 +162,12 @@ export function DriverTabBar({ pathname }: { pathname: string }) {
           >
             <DriverIcon name={active ? `${tab.icon}-active` : tab.icon} size={24} />
             <span>{tab.label}</span>
+            {tab.to === '/driver/sync' && pending > 0 && (
+              <span className="driver-tab-count">
+                {pending}
+                <span className="wp-sr-only"> waiting to sync</span>
+              </span>
+            )}
           </Link>
         );
       })}
