@@ -1,3 +1,5 @@
+import { apiErrorSchema, type Violation } from '@waypoint/shared';
+
 let requests = new AbortController();
 export function resetApiRequests() {
   requests.abort();
@@ -7,10 +9,12 @@ export function resetApiRequests() {
 export class HttpError extends Error {
   status: number;
   code: string;
-  constructor(status: number, code: string, message: string) {
+  violations: Violation[];
+  constructor(status: number, code: string, message: string, violations: Violation[] = []) {
     super(message);
     this.status = status;
     this.code = code;
+    this.violations = violations;
   }
 }
 export async function api<T>(
@@ -29,6 +33,7 @@ export async function api<T>(
         ...(options.signal ? [options.signal] : []),
       ]),
       headers: {
+        // A FormData body needs the browser's multipart boundary, so it sets its own type.
         ...(options.body && !(options.body instanceof FormData)
           ? { 'Content-Type': 'application/json' }
           : {}),
@@ -46,16 +51,27 @@ export async function api<T>(
   }
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
-    const error = (body as { error?: { code?: string; message?: string } } | null)?.error;
     if (response.status === 401 && path !== '/auth/me' && path !== '/auth/login') {
       window.dispatchEvent(new Event('waypoint:unauthenticated'));
     }
+    // SYSTEM_DESIGN §6.3: every API failure is { error: { code, message, violations? } }.
+    // Anything else (a proxy error page, an empty body) keeps the HTTP status only.
+    const envelope = apiErrorSchema.safeParse(body);
+    if (!envelope.success) {
+      throw new HttpError(
+        response.status,
+        'REQUEST_FAILED',
+        'The request failed. Please try again.',
+      );
+    }
+    const { error } = envelope.data;
     throw new HttpError(
       response.status,
-      error?.code ?? 'REQUEST_FAILED',
+      error.code,
       response.status >= 500
         ? 'The server could not complete your request. Please try again.'
-        : (error?.message ?? 'The request failed. Please try again.'),
+        : error.message,
+      error.violations ?? [],
     );
   }
   try {

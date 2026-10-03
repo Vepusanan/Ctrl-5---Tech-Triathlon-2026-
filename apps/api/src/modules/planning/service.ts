@@ -32,6 +32,7 @@ import type { DomainEventBus, PlanningDomainEvent } from '../../plugins/domain-e
 import { ApiError } from '../../plugins/errors.ts';
 import { scope } from '../../plugins/rbac.ts';
 import { formatColomboTimestamp } from '../orders/cutoff.ts';
+import { createOrderService, type OrderService } from '../orders/service.ts';
 import {
   draftsReferencing,
   loadPlanningContext,
@@ -86,11 +87,13 @@ export function createPlanningService(
   events: DomainEventBus,
   clock: OperatingClock,
   repo: PlanningRepo = createPlanningRepo(),
+  orders: OrderService = createOrderService(db, audit, events, clock),
 ): PlanningService {
   return {
     async queue(user, serviceDate) {
       const dispatcher = assertDispatcher(user);
       const depotId = requireDepot(dispatcher);
+      await orders.lockConfirmedOrdersForRun(dispatcher, serviceDate);
       const context = await loadPlanningContext(
         repo,
         db,
@@ -151,6 +154,7 @@ export function createPlanningService(
       return withOpenRun(
         db,
         repo,
+        orders,
         events,
         clock,
         user,
@@ -188,6 +192,7 @@ export function createPlanningService(
       const dispatcher = assertDispatcher(user);
       const depotId = requireDepot(dispatcher);
       if (input.depotId !== depotId) throw new ApiError('NOT_FOUND', MISSING_RUN);
+      await orders.lockConfirmedOrdersForRun(dispatcher, input.serviceDate);
       const context = await loadPlanningContext(
         repo,
         db,
@@ -220,6 +225,7 @@ export function createPlanningService(
       return withOpenRun(
         db,
         repo,
+        orders,
         events,
         clock,
         user,
@@ -267,6 +273,7 @@ export function createPlanningService(
       return withOpenRun(
         db,
         repo,
+        orders,
         events,
         clock,
         user,
@@ -377,6 +384,7 @@ export function createPlanningService(
     async simulate(user, serviceDate, input) {
       const dispatcher = assertDispatcher(user);
       const depotId = requireDepot(dispatcher);
+      await orders.lockConfirmedOrdersForRun(dispatcher, serviceDate);
       const context = await loadPlanningContext(
         repo,
         db,
@@ -393,6 +401,7 @@ export function createPlanningService(
       return withOpenRun(
         db,
         repo,
+        orders,
         events,
         clock,
         user,
@@ -522,6 +531,7 @@ export function createPlanningService(
 async function withOpenRun<T>(
   db: Database,
   repo: PlanningRepo,
+  orders: OrderService,
   events: DomainEventBus,
   clock: OperatingClock,
   user: User | null,
@@ -538,6 +548,9 @@ async function withOpenRun<T>(
 ): Promise<T> {
   const dispatcher = assertDispatcher(user);
   const depotId = requireDepot(dispatcher);
+  // SYSTEM_DESIGN §2.1: orders submitted before the 4 PM cutoff become Confirmed and join
+  // the run. The orders module owns that transition; planning only triggers it.
+  await orders.lockConfirmedOrdersForRun(dispatcher, serviceDate);
   const now = clock.now();
   const pending: PlanningDomainEvent[] = [];
   const result = await db.transaction(async (tx) => {

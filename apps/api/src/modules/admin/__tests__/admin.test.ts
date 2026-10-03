@@ -10,11 +10,12 @@ import {
 } from '@waypoint/database';
 import {
   currentUserResponseSchema,
+  operatingClockSchema,
   orderListResponseSchema,
   orderSchema,
   storeWorkspaceSchema,
 } from '@waypoint/shared';
-import { and, desc, eq, lt, ne } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   client,
@@ -25,6 +26,8 @@ import {
 } from '../../../../test/http.ts';
 import { createMigratedDatabase } from '../../../../test/postgres.ts';
 import { buildApp } from '../../../app.ts';
+import { createAdminRepo } from '../repo.ts';
+import { startDemoClock } from '../service.ts';
 
 const PASSWORD = DEFAULT_SEED_PASSWORD;
 
@@ -106,15 +109,33 @@ describe('demo admin', () => {
     expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
   });
 
-  it('refuses the clock and reset to every role except the dispatcher', async () => {
+  it('lets the driver read the clock but not move it or reset the seed', async () => {
+    const driver = await signIn(app, DEMO_USERS.driver.email);
+    const read = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/clock',
+      headers: { cookie: driver },
+    });
+    expect(read.statusCode).toBe(200);
+    expect(operatingClockSchema.parse(read.json()).now).toMatch(/\+05:30$/);
+    for (const call of [
+      {
+        method: 'PUT' as const,
+        url: '/api/v1/admin/clock',
+        payload: { now: '2026-06-26T06:00:00.000+05:30' },
+      },
+      { method: 'POST' as const, url: '/api/v1/admin/reset', payload: { confirm: true } },
+    ]) {
+      const response = await app.inject({ ...call, headers: { cookie: driver } });
+      expect(response.statusCode).toBe(403);
+    }
+  });
+
+  it('refuses the clock and reset to every other role', async () => {
     const anonymous = await app.inject({ method: 'GET', url: '/api/v1/admin/clock' });
     expect(anonymous.statusCode).toBe(401);
 
-    for (const email of [
-      DEMO_USERS.loader.email,
-      DEMO_USERS.driver.email,
-      DEMO_USERS.storeManager.email,
-    ]) {
+    for (const email of [DEMO_USERS.loader.email, DEMO_USERS.storeManager.email]) {
       const cookie = await signIn(app, email);
       for (const call of [
         { method: 'GET' as const, url: '/api/v1/admin/clock' },
@@ -148,19 +169,7 @@ describe('demo admin', () => {
     );
     const order = listed.items.find((item) => item.lockedAt === null);
     if (order === undefined) throw new Error('Expected an editable submitted order');
-    // The demo day can place more than one order in the same slot. Leave this one alone
-    // so the cutoff check is the only thing that can reject an edit.
-    await app.db
-      .update(orders)
-      .set({ status: 'cancelled' })
-      .where(
-        and(
-          eq(orders.outletId, order.outletId),
-          eq(orders.requestedDate, order.requestedDate),
-          eq(orders.temp, order.temp),
-          ne(orders.id, order.id),
-        ),
-      );
+    // The seed keeps one active order per slot, so only the cutoff can reject this edit.
 
     const previous = await previousOperatingDate(app, order.requestedDate);
     const beforeCutoff = `${previous}T15:30:00.000+05:30`;
@@ -287,6 +296,37 @@ describe('demo admin', () => {
       expect(encoded).not.toContain('passwordHash');
       expect(encoded).not.toContain('argon2');
     }
+  }, 90_000);
+
+  it('starts the demo clock before the cutoff that closes the seeded run', async () => {
+    const [meta] = await app.db.select().from(seedMeta);
+    if (meta === undefined) throw new Error('Expected seed metadata');
+    const [cutoffDay] = await app.db
+      .select({ date: calendarDays.date })
+      .from(calendarDays)
+      .where(and(lt(calendarDays.date, meta.serviceDate), eq(calendarDays.isOperating, true)))
+      .orderBy(desc(calendarDays.date))
+      .limit(1);
+    const start = `${cutoffDay?.date}T15:50:00.000+05:30`;
+
+    expect(await startDemoClock(createAdminRepo(app.db), app.clock)).toBe(start);
+    const dispatcher = await signIn(app, DEMO_USERS.dispatcher.email);
+    const read = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/clock',
+      headers: { cookie: dispatcher },
+    });
+    expect(read.json()).toEqual({ now: start });
+
+    await setClock(app, dispatcher, `${cutoffDay?.date}T16:05:00.000+05:30`);
+    expect((await reset(app, dispatcher)).statusCode).toBe(200);
+    const again = await signIn(app, DEMO_USERS.dispatcher.email);
+    const afterReset = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/clock',
+      headers: { cookie: again },
+    });
+    expect(afterReset.json()).toEqual({ now: start });
   }, 90_000);
 
   it('leaves the admin endpoints unregistered when demo mode is off', async () => {

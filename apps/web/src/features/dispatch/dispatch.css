@@ -99,6 +99,17 @@
   }
 }
 
+.dispatch-demo-clock {
+  display: grid;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
+  padding: var(--space-12);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-field);
+}
+.dispatch-demo-clock p {
+  margin: 0;
+}
 .dispatch-order.is-selected {
   outline: 2px solid var(--color-border-focus);
 }
@@ -114,4 +125,68 @@
 }
 .dispatch-chip {
   cursor: grab;
+}
+
+/* Dispatcher notification feed (top bar bell). */
+.dispatch-notices {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.dispatch-notices-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.dispatch-notices-head h2 {
+  margin: 0;
+}
+
+.dispatch-notices-list {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dispatch-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12);
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-subtle);
+}
+
+.dispatch-notice.is-unread {
+  background: var(--color-status-warning-subtle);
+}
+
+.dispatch-notice-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 160px;
+}
+
+.dispatch-notice-text small {
+  color: var(--color-text-secondary);
+}
+
+/* Two-step confirmation for the demo seed reset. */
+.dispatch-demo-reset {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-8);
+  border-radius: var(--radius-field);
+  background: var(--color-status-danger-subtle);
+}
+
+.dispatch-demo-reset p {
+  color: var(--color-status-danger);
+  font-size: var(--text-small);
 }

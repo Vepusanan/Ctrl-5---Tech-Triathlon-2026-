@@ -1,4 +1,9 @@
-import { DASHBOARD_POLL_INTERVAL_MS, type DashboardStreamMessage } from '@waypoint/shared';
+import {
+  DASHBOARD_POLL_INTERVAL_MS,
+  type DashboardStreamEntityType,
+  type DashboardStreamEventType,
+  type DashboardStreamMessage,
+} from '@waypoint/shared';
 import type { DomainEvent, OrderDomainEvent } from '../../plugins/domain-events.ts';
 
 export function streamPreamble(): string {
@@ -70,9 +75,9 @@ export function toDashboardStreamMessage(event: DomainEvent): DashboardStreamMes
 }
 
 function message(
-  type: string,
+  type: DashboardStreamEventType,
   occurredAt: string,
-  entityType: string,
+  entityType: DashboardStreamEntityType,
   entityId: string,
 ): DashboardStreamMessage {
   return { type, occurredAt, entityType, entityId };

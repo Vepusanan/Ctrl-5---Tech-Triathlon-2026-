@@ -1,6 +1,8 @@
 import { createDatabase, loadSeedEnv } from '@waypoint/database';
 import { buildApp } from './app.ts';
 import { loadEnv, secureSessionCookies } from './config/env.ts';
+import { createAdminRepo } from './modules/admin/repo.ts';
+import { startDemoClock } from './modules/admin/service.ts';
 
 const env = loadEnv(process.env);
 const seedEnv = env.DEMO_MODE ? loadSeedEnv(process.env) : undefined;
@@ -25,6 +27,13 @@ const app = await buildApp({
       }),
 });
 app.addHook('onClose', () => connection.close());
+
+// The pin lives in memory, so every start re-derives it from the seeded day.
+if (env.DEMO_MODE) {
+  const start = await startDemoClock(createAdminRepo(connection.db), app.clock);
+  if (start === null) app.log.warn('demo_clock.unseeded');
+  else app.log.info({ now: start }, 'demo_clock.pinned');
+}
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {

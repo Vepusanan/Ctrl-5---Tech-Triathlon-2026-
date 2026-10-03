@@ -143,11 +143,50 @@ export const dashboardExceptionsSchema = z.object({
 });
 export type DashboardExceptions = z.infer<typeof dashboardExceptionsSchema>;
 
+// Every domain event the dispatcher stream forwards (SYSTEM_DESIGN §11.2). The client listens for
+// each by name, so this list is the contract between the API emitter and the web client.
+export const dashboardStreamEventTypeSchema = z.enum([
+  'order.submitted',
+  'order.confirmed',
+  'order.cancelled',
+  'order.changed',
+  'order.deferred',
+  'plan.published',
+  'allocation.changed',
+  'trip.changed',
+  'trip.departed',
+  'loading.started',
+  'loading.verified',
+  'loading.issue_recorded',
+  'loading.issue_acknowledged',
+  'loading.ready',
+  'stop.arrived',
+  'stop.delivered',
+  'stop.failed',
+  'stop.pod_recorded',
+  'receipt.confirmed',
+  'issue.reported',
+  'sync.conflict',
+]);
+export type DashboardStreamEventType = z.infer<typeof dashboardStreamEventTypeSchema>;
+
+export const dashboardStreamEntityTypeSchema = z.enum([
+  'order',
+  'planning_run',
+  'trip',
+  'loading_issue',
+  'stop',
+  'receipt',
+  'issue',
+  'sync_conflict',
+]);
+export type DashboardStreamEntityType = z.infer<typeof dashboardStreamEntityTypeSchema>;
+
 // Lightweight invalidation hint. The client refetches; the payload is not a dashboard snapshot.
 export const dashboardStreamMessageSchema = z.object({
-  type: z.string().min(1),
+  type: dashboardStreamEventTypeSchema,
   occurredAt: timestampSchema,
-  entityType: z.string().min(1),
+  entityType: dashboardStreamEntityTypeSchema,
   entityId: z.string().min(1),
 });
 export type DashboardStreamMessage = z.infer<typeof dashboardStreamMessageSchema>;

@@ -29,6 +29,10 @@ export default defineConfig({
       },
       {
         extends: true,
+        test: { name: 'web', root: './apps/web', include: ['test/**/*.test.ts'] },
+      },
+      {
+        extends: true,
         test: {
           name: 'database',
           root: './packages/database',

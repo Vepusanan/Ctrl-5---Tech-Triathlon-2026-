@@ -12,10 +12,12 @@ export function adminRoutes(seed: DemoSeedConfig): FastifyPluginAsyncZod {
   const plugin: FastifyPluginAsyncZod = async (app) => {
     const service = createAdminService(app.db, app.audit, app.clock, app.log, seed);
 
+    // Drivers read the clock to stamp stop events on the demo timeline; only the dispatcher
+    // may move it or reset the seed.
     app.get(
       '/admin/clock',
       {
-        preHandler: app.requireRole('dispatcher'),
+        preHandler: app.requireRole('dispatcher', 'driver'),
         schema: {
           tags: ['admin'],
           response: {

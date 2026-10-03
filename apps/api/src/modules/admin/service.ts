@@ -10,7 +10,24 @@ import type { AuditRecorder } from '../../plugins/audit.ts';
 import type { OperatingClock } from '../../plugins/clock.ts';
 import { ApiError } from '../../plugins/errors.ts';
 import { formatColomboTimestamp } from '../orders/cutoff.ts';
-import { createAdminRepo, DEMO_DISPATCHER_EMAIL } from './repo.ts';
+import { type AdminRepo, createAdminRepo, DEMO_DISPATCHER_EMAIL } from './repo.ts';
+
+// DEMO_MODE runs on the seeded day, not the host date (SYSTEM_DESIGN §12.2). The demo opens
+// ten minutes before the 4 PM cutoff that closes the seeded run, so the editable seeded
+// orders can still change and the dispatcher can move the clock past the cutoff on cue.
+const DEMO_START_TIME = '15:50:00.000';
+
+/** Pins the operating clock to the seeded demo start. Returns null when nothing is seeded. */
+export async function startDemoClock(
+  repo: Pick<AdminRepo, 'findSeededDay'>,
+  clock: OperatingClock,
+): Promise<string | null> {
+  const day = await repo.findSeededDay();
+  if (day === null) return null;
+  const start = new Date(`${day.cutoffDate}T${DEMO_START_TIME}+05:30`);
+  clock.pin(start);
+  return formatColomboTimestamp(start);
+}
 
 export interface DemoSeedConfig {
   password: string;
@@ -65,6 +82,8 @@ export function createAdminService(
       if (!restored.applied) {
         throw new ApiError('INTERNAL_ERROR', 'Could not restore the demo seed');
       }
+      // A reset restores the seeded day, so the operating clock returns to its start too.
+      await startDemoClock(repo, clock);
 
       const actor =
         (await repo.findUserByEmail(user.email)) ??

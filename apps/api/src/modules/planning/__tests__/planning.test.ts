@@ -144,6 +144,46 @@ describe('planning', () => {
     });
   });
 
+  it('confirms submitted orders into the queue once the 4 PM cutoff has passed', async () => {
+    const submitted = await insertOrder({ status: 'submitted' });
+    const queue = () =>
+      app.inject({
+        method: 'GET',
+        url: `/api/v1/planning/runs/${SERVICE_DATE}/queue`,
+        headers: { cookie: dispatcher.cookie },
+      });
+
+    // PINNED is 10:00 on the cutoff day, so the order is still open to the store.
+    const before = planningQueueResponseSchema.parse(json(await queue(), 200));
+    expect(before.items.map((item) => item.id)).not.toContain(submitted);
+
+    app.clock.pin(new Date('2026-10-06T16:00:00.000+05:30'));
+    const after = planningQueueResponseSchema.parse(json(await queue(), 200));
+    expect(after.items.map((item) => item.id)).toEqual([submitted]);
+    expect(after.items[0]).toMatchObject({
+      status: 'confirmed',
+      lockedAt: '2026-10-06T16:00:00.000+05:30',
+    });
+
+    // A second read does not confirm or notify again.
+    planningQueueResponseSchema.parse(json(await queue(), 200));
+    const store = await database.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, 'planning.store@waypoint.test'));
+    const notes = await database.db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.entityId, submitted));
+    expect(notes).toEqual([
+      expect.objectContaining({
+        recipientId: store[0]?.id,
+        type: 'order_confirmed',
+        entityType: 'order',
+      }),
+    ]);
+  });
+
   it('rejects every other role', async () => {
     const orderId = '00000000-0000-4000-8000-000000000099';
     const calls = [

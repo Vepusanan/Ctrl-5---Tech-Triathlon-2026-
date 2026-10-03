@@ -116,7 +116,27 @@ export function buildDemoDay(reference: ReferenceData, serviceDate: string): Dem
     fresh.find((outlet) => outlet.id !== store.id && outlet.id !== vanOnly.id) ?? store;
   const orders: DemoOrder[] = [];
 
+  // The API allows one active order per outlet, date and temperature, so the seed keeps every
+  // slot distinct. The store manager's own outlet holds the walkthrough's moves: its ambient
+  // order for this run is still open at the 15:50 demo start and is confirmed at the 4 PM cutoff,
+  // and its chilled slot is left free for the order the walkthrough places.
   for (const outlet of fresh) {
+    if (outlet.id === store.id) {
+      orders.push(
+        orderRow(
+          `order:${serviceDate}:submitted:${outlet.id}`,
+          outlet,
+          'ambient',
+          serviceDate,
+          pickSize(reference.orderSizes, 'Fresh', 'ambient', rng),
+          'submitted',
+          editableSubmittedAt,
+          null,
+          1,
+        ),
+      );
+      continue;
+    }
     orders.push(
       confirmedOrder(
         `order:${serviceDate}:ambient:${outlet.id}`,
@@ -130,18 +150,6 @@ export function buildDemoDay(reference: ReferenceData, serviceDate: string): Dem
       ),
     );
   }
-  orders.push(
-    confirmedOrder(
-      `order:${serviceDate}:chilled:${store.id}`,
-      store,
-      'chilled',
-      serviceDate,
-      reference,
-      rng,
-      submittedAt,
-      lockedAt,
-    ),
-  );
   if (vanOnly.id !== store.id) {
     orders.push(
       confirmedOrder(
@@ -183,9 +191,16 @@ export function buildDemoDay(reference: ReferenceData, serviceDate: string): Dem
 
   const availability = vehicleAvailability(reference.vehicles, driverVan.id, serviceDate);
   const capacity = availableReeferCapacity(reference.vehicles, availability, home);
+  // Extra chilled demand goes to outlets with no chilled order yet, never the store's free slot.
+  const chilledTaken = new Set(
+    orders.filter((order) => order.temp === 'chilled').map((order) => order.outletId),
+  );
+  const extraOutlets = fresh.filter(
+    (outlet) => outlet.id !== store.id && !chilledTaken.has(outlet.id),
+  );
   let extra = 0;
-  while (!chilledExceeds(orders, capacity) && extra < fresh.length * 8) {
-    const outlet = fresh[extra % fresh.length];
+  while (!chilledExceeds(orders, capacity) && extra < extraOutlets.length) {
+    const outlet = extraOutlets[extra];
     if (outlet === undefined) break;
     const demand = chilledDemand(orders);
     const size = largestSize(
@@ -213,37 +228,26 @@ export function buildDemoDay(reference: ReferenceData, serviceDate: string): Dem
     throw new Error('Could not build more chilled demand than available reefer capacity');
   }
 
-  for (let index = 0; index < 3; index += 1) {
-    const temp = index === 1 ? 'chilled' : 'ambient';
-    orders.push(
-      orderRow(
-        `order:${serviceDate}:draft:${index}`,
-        store,
-        temp,
-        serviceDate,
-        pickSize(reference.orderSizes, 'Fresh', temp, rng),
-        'draft',
-        null,
-        null,
-        0,
-      ),
-    );
+  // Unsubmitted drafts for the next run, one per temperature, so each can still be submitted.
+  const nextRun = nextOperatingDay(reference.calendarDays, serviceDate);
+  if (nextRun !== undefined) {
+    for (const temp of ['ambient', 'chilled'] as const) {
+      orders.push(
+        orderRow(
+          `order:${serviceDate}:draft:${temp}`,
+          store,
+          temp,
+          nextRun,
+          pickSize(reference.orderSizes, 'Fresh', temp, rng),
+          'draft',
+          null,
+          null,
+          0,
+        ),
+      );
+    }
   }
-  for (let index = 0; index < 2; index += 1) {
-    orders.push(
-      orderRow(
-        `order:${serviceDate}:submitted:${index}`,
-        store,
-        'ambient',
-        serviceDate,
-        pickSize(reference.orderSizes, 'Fresh', 'ambient', rng),
-        'submitted',
-        editableSubmittedAt,
-        null,
-        1,
-      ),
-    );
-  }
+  assertDistinctSlots(orders);
 
   const dispatcherId = seedUuid(DEMO_USERS.dispatcher.key);
   const yesterdayRunId = seedUuid(`run:${previousOperatingDate}:${home}`);
@@ -483,6 +487,23 @@ function previousOperatingDay(calendar: CalendarDayRecord[], serviceDate: string
   const day = prior.at(-1);
   if (day === undefined) throw new Error(`No operating day before ${serviceDate}`);
   return day.date;
+}
+
+function nextOperatingDay(calendar: CalendarDayRecord[], serviceDate: string): string | undefined {
+  return calendar
+    .filter((day) => day.date > serviceDate && day.isOperating)
+    .sort((left, right) => left.date.localeCompare(right.date))[0]?.date;
+}
+
+/** Mirrors the API rule: at most one order per outlet, date and temperature that is not cancelled. */
+function assertDistinctSlots(orders: DemoOrder[]): void {
+  const seen = new Set<string>();
+  for (const order of orders) {
+    if (order.status === 'cancelled') continue;
+    const slot = `${order.outletId}|${order.requestedDate}|${order.temp}`;
+    if (seen.has(slot)) throw new Error(`Demo seed places two active orders in slot ${slot}`);
+    seen.add(slot);
+  }
 }
 
 function byId<T extends { id: string }>(left: T, right: T): number {

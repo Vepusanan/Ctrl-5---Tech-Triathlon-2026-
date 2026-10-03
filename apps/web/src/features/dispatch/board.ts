@@ -15,7 +15,7 @@ import {
   vehicleListResponseSchema,
 } from '@waypoint/shared';
 import { useMemo, useState } from 'react';
-import { api, message } from '../../lib/api';
+import { api, HttpError, message } from '../../lib/api';
 import { draftsOf, inspectDraft, placeOrder, planningInput, type TripSlot } from './engine';
 import { useDispatch } from './workspace';
 
@@ -120,6 +120,10 @@ export function useBoard() {
     },
     onError: (cause) => {
       setSlots(null);
+      // POST /planning/validate reports hard violations as a 422 with the list attached.
+      if (cause instanceof HttpError && cause.violations.length > 0) {
+        setServerViolations(cause.violations);
+      }
       setError(message(cause));
     },
   });

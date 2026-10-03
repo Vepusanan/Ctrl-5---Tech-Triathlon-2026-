@@ -132,6 +132,7 @@ export function TopBar({
   searchPlaceholder = 'Search components',
   searchLabel = 'Search components',
   onNotifications,
+  notificationCount = 0,
   profile,
   connectivity = 'online',
 }: {
@@ -143,6 +144,8 @@ export function TopBar({
   searchPlaceholder?: string;
   searchLabel?: string;
   onNotifications?: () => void;
+  /** Unread items shown on the bell; 0 hides the count. */
+  notificationCount?: number;
   profile?: ReactNode;
   connectivity?: 'online' | 'offline' | 'stale';
 }) {
@@ -193,10 +196,17 @@ export function TopBar({
         <Button
           variant="secondary"
           className="wp-icon-button"
-          aria-label="Notifications"
+          aria-label={
+            notificationCount > 0 ? `Notifications, ${notificationCount} unread` : 'Notifications'
+          }
           onClick={onNotifications}
         >
           <img src="/waypoint/bell.svg" alt="" />
+          {notificationCount > 0 && (
+            <span className="wp-bell-count" aria-hidden="true">
+              {notificationCount > 9 ? '9+' : notificationCount}
+            </span>
+          )}
         </Button>
       )}
       {profile}

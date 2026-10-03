@@ -1,524 +1,182 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  can,
-  type DeliveryStop,
-  type StopEventInput,
-  syncTripDeltaSchema,
-  tripDetailSchema,
-  type User,
-} from '@waypoint/shared';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom';
-import { Badge, Button, Card, ErrorState, LoadingState } from '../../components/waypoint';
-import { api, message } from '../../lib/api';
-import { SignOut } from '../auth/auth';
-import { Notifications } from '../auth/notifications';
+import type { DeliveryStop, User } from '@waypoint/shared';
+import { createContext, useContext, useEffect, useRef } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { ErrorState, LoadingState } from '../../components/waypoint';
+import { message } from '../../lib/api';
 import { useOnline } from '../store/shared';
-import {
-  acceptedVersion,
-  acceptVersion,
-  driverOwner,
-  loadStop,
-  loadTrips,
-  type Pending,
-  queueEvent,
-  readOutbox,
-  syncOutbox,
-} from './offline';
+import { DriverAccount } from './account';
+import { colomboTimestamp, useDriverClock } from './clock';
+import { NoticeDetail, Notices } from './notices';
+import { type SyncState, useSyncEngine } from './offline/engine';
+import { enqueue, stopEntries } from './offline/store';
+import { localStopStatus } from './offline/sync-core';
+import type { OutboxEntry, PodBlob } from './offline/types';
+import { StopOutcome } from './outcome';
+import { DriverTabBar, OFFLINE_ICON, OfflineBar, SyncingBar } from './shell';
+import { StopDetail } from './stop';
+import { DriverSync } from './sync';
+import { TripOverview } from './trip';
+import { MyTrips } from './trips';
 import './driver.css';
 
 type Driver = Extract<User, { role: 'driver' }>;
-export function DriverWorkspaceApp({ user }: { user: Driver }) {
-  const owner = driverOwner(user);
-  const online = useOnline();
-  const client = useQueryClient();
-  const active = useRef(false);
-  const lifecycle = useRef(new AbortController());
-  const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState('');
-  const outbox = useQuery({
-    queryKey: ['driver', owner, 'outbox'],
-    queryFn: () => readOutbox(owner),
-    networkMode: 'always',
-    refetchInterval: 2000,
-  });
-  const sync = useCallback(async () => {
-    if (active.current || !navigator.onLine || lifecycle.current.signal.aborted) return;
-    const signal = lifecycle.current.signal;
-    active.current = true;
-    setSyncing(true);
-    setError('');
-    try {
-      await syncOutbox(owner, signal);
-      if (!signal.aborted) await client.invalidateQueries({ queryKey: ['driver', owner] });
-    } catch (cause) {
-      if (!signal.aborted) setError(message(cause));
-    } finally {
-      active.current = false;
-      setSyncing(false);
-    }
-  }, [client, owner]);
-  useEffect(() => {
-    lifecycle.current = new AbortController();
-    const trigger = () => void sync();
-    const timer = window.setInterval(trigger, 20_000);
-    window.addEventListener('online', trigger);
-    window.addEventListener('focus', trigger);
-    trigger();
-    return () => {
-      lifecycle.current.abort();
-      clearInterval(timer);
-      window.removeEventListener('online', trigger);
-      window.removeEventListener('focus', trigger);
+
+/** One stop outcome as the driver records it, before it reaches the server. */
+export type StopAction =
+  | { stop: DeliveryStop; type: 'arrived' }
+  | { stop: DeliveryStop; type: 'failed'; reason: string }
+  | { stop: DeliveryStop; type: 'delivered'; podId: string }
+  | {
+      stop: DeliveryStop;
+      type: 'delivered';
+      pod: { recipientName: string; signature: Blob; photo?: Blob };
     };
-  }, [sync]);
-  const pending = outbox.data?.filter((row) => row.status === 'queued').length ?? 0;
-  return (
-    <div className="driver-workspace">
-      <header>
-        <Link className="wp-brand" to="/driver">
-          <span>W</span>Waypoint
-        </Link>
-        <strong>
-          {user.name} · {user.vehicleId}
-        </strong>
-        <SignOut />
-      </header>
-      <nav aria-label="Driver navigation">
-        <Link to="/driver/trips">My Trips</Link>
-        <Link to="/driver/current">Current Trip</Link>
-        <Link to="/driver/sync">Sync ({pending})</Link>
-        <Link to="/driver/notifications">Notifications</Link>
-      </nav>
-      <main>
-        <p role="status">
-          <Badge tone={online ? 'success' : 'warning'}>
-            {syncing ? 'Syncing' : online ? 'Online' : 'Offline'}
-          </Badge>{' '}
-          {pending ? `${pending} pending sync` : 'No pending events'}
-        </p>
-        {error && <p role="alert">{error}</p>}
-        {outbox.error && (
-          <ErrorState title="Offline storage unavailable" description={message(outbox.error)} />
-        )}
-        <Routes>
-          <Route path="/" element={<Trips owner={owner} />} />
-          <Route path="trips" element={<Trips owner={owner} />} />
-          <Route path="current" element={<Trips owner={owner} current />} />
-          <Route path="trips/:id" element={<Trip owner={owner} online={online} />} />
-          <Route
-            path="stops/:id"
-            element={<Stop user={user} owner={owner} rows={outbox.data ?? []} sync={sync} />}
-          />
-          <Route
-            path="sync"
-            element={
-              <>
-                <h1>Sync</h1>
-                <p>
-                  Queued events stay on this device for your account until confirmed by the server.
-                </p>
-                <Button busy={syncing} disabled={!online} onClick={() => void sync()}>
-                  Sync now
-                </Button>
-                {outbox.data?.map((row) => (
-                  <Card key={row.key}>
-                    <strong>
-                      {row.event.type} · {row.status === 'queued' ? 'Pending sync' : row.status}
-                    </strong>
-                    <p>
-                      {row.detail ||
-                        new Date(row.event.clientTime).toLocaleString('en-GB', {
-                          timeZone: 'Asia/Colombo',
-                        })}
-                    </p>
-                  </Card>
-                ))}
-              </>
-            }
-          />
-          <Route path="notifications" element={<Notifications user={user} />} />
-          <Route
-            path="*"
-            element={
-              <>
-                <h1>Page not found</h1>
-                <Link to="/driver">My Trips</Link>
-              </>
-            }
-          />
-        </Routes>
-      </main>
-    </div>
-  );
-}
-function useTrips(owner: string) {
-  return useQuery({
-    queryKey: ['driver', owner, 'trips'],
-    queryFn: ({ signal }) => loadTrips(owner, signal),
-    networkMode: 'always',
-    retry: false,
-    refetchInterval: 30_000,
-  });
-}
-function Trips({ owner, current = false }: { owner: string; current?: boolean }) {
-  const trips = useTrips(owner);
-  if (trips.isPending) return <LoadingState label="Loading your trips…" />;
-  if (!trips.data)
-    return <ErrorState description={message(trips.error)} onRetry={() => void trips.refetch()} />;
-  const activeTrip =
-    trips.data.find((t) => t.status === 'departed') ?? trips.data.find((t) => t.status === 'ready');
-  if (current && activeTrip) return <Navigate to={`/driver/trips/${activeTrip.id}`} replace />;
-  return (
-    <>
-      <h1>{current ? 'Current Trip' : 'My Trips'}</h1>
-      {!trips.data.length || (current && !activeTrip) ? (
-        <Card>
-          No assigned {current ? 'current ' : ''}trips. Published assignments will appear here.
-        </Card>
-      ) : (
-        trips.data.map((trip) => (
-          <Card key={trip.id}>
-            <h2>
-              {trip.district} · Trip {trip.tripNo}
-            </h2>
-            <p>
-              {trip.run.serviceDate} · {trip.vehicleId} · {trip.status}
-            </p>
-            <p>{trip.stops.length} stops</p>
-            <Link to={`/driver/trips/${trip.id}`}>Open trip</Link>
-          </Card>
-        ))
-      )}
-    </>
-  );
-}
-function usePlanChange(
-  owner: string,
-  tripId: string | undefined,
-  version: number | undefined,
-  online: boolean,
-) {
-  return useQuery({
-    queryKey: ['driver', owner, 'plan', tripId, version],
-    queryFn: async () => {
-      if (!tripId || version === undefined) throw new Error('Trip required');
-      const since = await acceptedVersion(owner, tripId, version);
-      return api(`/sync/trips/${tripId}?since=${since}`, syncTripDeltaSchema);
-    },
-    enabled: online && !!tripId && version !== undefined,
-    retry: false,
-    refetchInterval: 20_000,
-  });
-}
-function Trip({ owner, online }: { owner: string; online: boolean }) {
-  const { id } = useParams();
-  const client = useQueryClient();
-  const trips = useTrips(owner);
-  const trip = trips.data?.find((t) => t.id === id);
-  const delta = usePlanChange(owner, trip?.id, trip?.version, online);
-  const depart = useMutation({
-    mutationFn: () =>
-      api(`/trips/${id}/depart`, tripDetailSchema, {
-        method: 'POST',
-        headers: { 'If-Match': String(trip?.version) },
-      }),
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ['driver', owner] });
-    },
-  });
-  if (trips.isPending) return <LoadingState label="Loading trip…" />;
-  if (!trip)
-    return (
-      <ErrorState
-        title="Trip not found"
-        description={
-          trips.error ? message(trips.error) : 'This trip is not assigned to your vehicle.'
-        }
-      />
-    );
-  const changed = delta.data?.changed ? delta.data : null;
-  return (
-    <>
-      <h1>
-        {trip.district} · Trip {trip.tripNo}
-      </h1>
-      <p>
-        {trip.status} · {trip.run.serviceDate}
-      </p>
-      {changed && (
-        <Card>
-          <h2>Route changed</h2>
-          <p>
-            {changed.added.length} added · {changed.removed.length} removed ·{' '}
-            {changed.reordered.length} reordered
-          </p>
-          <Button
-            onClick={() => {
-              void acceptVersion(owner, trip.id, changed.version).then(() =>
-                client.invalidateQueries({ queryKey: ['driver', owner] }),
-              );
-            }}
-          >
-            Acknowledge updated route
-          </Button>
-        </Card>
-      )}
-      {depart.error && (
-        <p role="alert">{message(depart.error)} Refresh the trip before trying again.</p>
-      )}
-      {trip.status === 'ready' && (
-        <Button
-          disabled={!online || !!changed}
-          busy={depart.isPending}
-          onClick={() => depart.mutate()}
-        >
-          Depart
-        </Button>
-      )}
-      {trip.stops.map((stop) => (
-        <Card key={stop.id}>
-          <h2>
-            Stop {stop.seq} · {stop.order.outletId}
-          </h2>
-          <p>
-            {stop.order.units} units · {stop.status}
-          </p>
-          <p>
-            Planned arrival{' '}
-            {new Date(stop.plannedArrival).toLocaleTimeString('en-GB', {
-              timeZone: 'Asia/Colombo',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </p>
-          {!changed && trip.status === 'departed' && (
-            <Link to={`/driver/stops/${stop.id}`}>Open stop</Link>
-          )}
-        </Card>
-      ))}
-    </>
-  );
-}
-function Stop({
-  user,
-  owner,
-  rows,
-  sync,
-}: {
+
+interface DriverContextValue {
   user: Driver;
-  owner: string;
-  rows: Pending[];
-  sync: () => Promise<void>;
-}) {
-  const { id = '' } = useParams();
-  const client = useQueryClient();
-  const stop = useQuery({
-    queryKey: ['driver', owner, 'stop', id],
-    queryFn: ({ signal }) => loadStop(owner, id, signal),
-    networkMode: 'always',
-    retry: false,
-  });
+  online: boolean;
+  /** The operating-clock time now, as an ISO timestamp with +05:30. */
+  stamp: () => string;
+  /** A device time (ms) on the operating clock, for times the phone itself keeps. */
+  clockAt: (deviceMs: number) => string;
+  /**
+   * Records a stop outcome locally first (SYSTEM_DESIGN §8.2): IndexedDB, then the screens,
+   * then the outbox sends it with its own client event id. Online and offline take this path.
+   */
+  record: (action: StopAction) => Promise<void>;
+  sync: SyncState;
+}
+
+const DriverContext = createContext<DriverContextValue | null>(null);
+
+export function useDriver() {
+  const value = useContext(DriverContext);
+  if (!value) throw new Error('Driver workspace required');
+  return value;
+}
+
+/** Whether this stop has events still on the phone, and whether the server refused one. */
+export function useStopSync(stopId: string) {
+  const { sync } = useDriver();
+  const entries = sync.entries.filter((entry) => entry.stopId === stopId);
+  const local = localStopStatus('pending', entries);
+  return { entries, pending: local.pending, conflict: local.conflict };
+}
+
+export function DriverWorkspaceApp({ user }: { user: Driver }) {
+  return <DriverLayout user={user} />;
+}
+
+function DriverLayout({ user }: { user: Driver }) {
   const online = useOnline();
-  const delta = usePlanChange(owner, stop.data?.tripId, stop.data?.tripVersion, online);
-  const [reason, setReason] = useState('');
-  const [recipient, setRecipient] = useState('');
-  const [signature, setSignature] = useState<Blob | null>(null);
-  const [photo, setPhoto] = useState<File | null>(null);
-  const record = useMutation({
-    networkMode: 'always',
-    mutationFn: async (type: StopEventInput['type']) => {
-      if (!stop.data || !can(user, 'delivery:update')) throw new Error('Delivery access required');
-      const base = {
-        clientEventId: crypto.randomUUID(),
-        stopId: id,
-        clientTime: new Date().toISOString(),
-        tripVersion: stop.data.tripVersion,
+  const location = useLocation();
+  const clock = useDriverClock(user.id);
+  const sync = useSyncEngine(user.id, online);
+  // Fetch the offline bar's icon while online; once the connection drops it cannot be loaded.
+  const offlineIcon = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    const image = new Image();
+    image.src = OFFLINE_ICON;
+    offlineIcon.current = image;
+  }, []);
+  if (clock.isPending) {
+    return (
+      <div className="driver-app driver-app--focus">
+        <main className="driver-main">
+          <LoadingState label="Checking the operating clock…" />
+        </main>
+      </div>
+    );
+  }
+  if (!clock.ready) {
+    return (
+      <div className="driver-app driver-app--focus">
+        <main className="driver-main">
+          <ErrorState description={message(clock.error)} onRetry={() => void clock.refetch()} />
+        </main>
+      </div>
+    );
+  }
+  const offset = clock.offset;
+  const clockAt = (deviceMs: number) => colomboTimestamp(deviceMs + offset);
+  const stamp = () => clockAt(Date.now());
+  const lastSync = sync.lastSyncAt === null ? null : clockAt(sync.lastSyncAt);
+  const record = async (action: StopAction) => {
+    const { stop } = action;
+    // A second tap on the same outcome while the first is still on the phone is the same action.
+    const earlier = await stopEntries(user.id, stop.id);
+    if (earlier.some((entry) => entry.type === action.type && entry.status !== 'conflict')) return;
+    const clientTime = stamp();
+    const entry: OutboxEntry = {
+      clientEventId: newEventId(),
+      userId: user.id,
+      tripId: stop.tripId,
+      stopId: stop.id,
+      outletId: stop.order.outletId,
+      type: action.type,
+      clientTime,
+      tripVersion: stop.tripVersion,
+      status: 'queued',
+      attempts: 0,
+      nextAttemptAt: 0,
+      createdAt: Date.now(),
+    };
+    let pod: PodBlob | undefined;
+    if (action.type === 'failed') entry.reason = action.reason;
+    if (action.type === 'delivered' && 'podId' in action) entry.podId = action.podId;
+    if (action.type === 'delivered' && 'pod' in action) {
+      pod = {
+        id: newEventId(),
+        userId: user.id,
+        stopId: stop.id,
+        recipientName: action.pod.recipientName,
+        clientTime,
+        signature: action.pod.signature,
+        ...(action.pod.photo ? { photo: action.pod.photo } : {}),
       };
-      let event: StopEventInput;
-      if (type === 'failed') event = { ...base, type, payload: { reason: reason.trim() } };
-      else if (type === 'delivered')
-        event = { ...base, type, payload: { podId: stop.data.pod?.id ?? crypto.randomUUID() } };
-      else event = { ...base, type, payload: {} };
-      const entry: Omit<Pending, 'status' | 'detail'> = { owner, event };
-      if (type === 'delivered' && !stop.data.pod) {
-        if (!signature || !recipient.trim())
-          throw new Error('Recipient name and signature are required');
-        entry.proof = { recipientName: recipient.trim(), signature, ...(photo ? { photo } : {}) };
-      }
-      await queueEvent(entry);
-    },
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ['driver', owner, 'outbox'] });
-      void sync();
-    },
-  });
-  if (stop.isPending) return <LoadingState label="Loading stop…" />;
-  if (!stop.data)
-    return <ErrorState description={message(stop.error)} onRetry={() => void stop.refetch()} />;
-  const data: DeliveryStop = stop.data;
-  const ownRows = rows.filter((row) => row.event.stopId === id);
-  const queued = ownRows.filter((row) => row.status === 'queued');
-  const last = queued.at(-1);
-  const status = last?.event.type ?? data.status;
-  const blocked = ownRows.some((row) => row.status === 'conflict' || row.status === 'rejected');
-  const enabled =
-    data.tripStatus === 'departed' &&
-    !blocked &&
-    !record.isPending &&
-    !delta.data?.changed &&
-    (!online || delta.isSuccess);
+      entry.blobId = pod.id;
+      entry.recipientName = action.pod.recipientName;
+    }
+    await enqueue(entry, pod);
+    void sync.syncNow();
+  };
+  // Stop and outcome screens are focus screens without the tab bar (Figma DR03, DR04, DR04a).
+  const focus = location.pathname.startsWith('/driver/stops/');
   return (
-    <>
-      <Link to={`/driver/trips/${data.tripId}`}>Back to trip</Link>
-      <h1>
-        Stop {data.seq} · {data.order.outletId}
-      </h1>
-      <p>
-        {data.order.units} units · {status}
-        {queued.length ? ' · Pending sync' : ''}
-      </p>
-      {delta.data?.changed && (
-        <p role="alert">
-          Route changed. Return to the trip and acknowledge the updated route before continuing.
-        </p>
-      )}
-      {delta.error && <p role="alert">{message(delta.error)}</p>}
-      {blocked && (
-        <p role="alert">A queued update needs review. Open Sync for the server explanation.</p>
-      )}
-      {record.error && <p role="alert">{message(record.error)}</p>}
-      {status === 'pending' && (
-        <Button disabled={!enabled} onClick={() => record.mutate('arrived')}>
-          Arrived
-        </Button>
-      )}
-      {status === 'arrived' && (
-        <Card>
-          <h2>Delivery outcome</h2>
-          <form
-            className="store-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              record.mutate('delivered');
-            }}
-          >
-            {!data.pod && (
-              <>
-                <label>
-                  Recipient name
-                  <input
-                    required
-                    maxLength={120}
-                    value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)}
-                  />
-                </label>
-                <Signature onChange={setSignature} />
-                <label>
-                  Photo (optional, up to 2 MB)
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-              </>
-            )}
-            <Button
-              type="submit"
-              disabled={
-                !enabled ||
-                (!data.pod && (!signature || !recipient.trim())) ||
-                (photo?.size ?? 0) > 2 * 1024 * 1024
-              }
-            >
-              Delivered
-            </Button>
-          </form>
-          <form
-            className="store-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              record.mutate('failed');
-            }}
-          >
-            <label>
-              Failure reason
-              <textarea
-                required
-                maxLength={200}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-              />
-            </label>
-            <Button type="submit" variant="secondary" disabled={!enabled || !reason.trim()}>
-              Failed
-            </Button>
-          </form>
-        </Card>
-      )}
-      {data.failureReason && <p>{data.failureReason}</p>}
-      {data.tripStatus !== 'departed' && status !== 'delivered' && status !== 'failed' && (
-        <p>Depart the ready trip before recording stop events.</p>
-      )}
-    </>
+    <DriverContext.Provider value={{ user, online, stamp, clockAt, record, sync }}>
+      <div className={`driver-app${focus ? ' driver-app--focus' : ''}`}>
+        <a href="#main-content" className="wp-skip">
+          Skip to content
+        </a>
+        <main className="driver-main" id="main-content" tabIndex={-1}>
+          {!online && <OfflineBar pending={sync.pending} lastSyncAt={lastSync} />}
+          {online && sync.pending + sync.conflicts > 0 && (
+            <SyncingBar pending={sync.pending} conflicts={sync.conflicts} />
+          )}
+          <Routes>
+            <Route path="/" element={<MyTrips />} />
+            <Route path="trips/:tripId" element={<TripOverview />} />
+            <Route path="stops/:stopId" element={<StopDetail />} />
+            <Route path="stops/:stopId/outcome" element={<StopOutcome />} />
+            <Route path="notices" element={<Notices />} />
+            <Route path="notices/:noticeId" element={<NoticeDetail />} />
+            <Route path="sync" element={<DriverSync />} />
+            <Route path="account" element={<DriverAccount />} />
+            <Route path="*" element={<Navigate to="/driver" replace />} />
+          </Routes>
+        </main>
+        {!focus && <DriverTabBar pathname={location.pathname} pending={sync.pending} />}
+      </div>
+    </DriverContext.Provider>
   );
 }
-function Signature({ onChange }: { onChange: (blob: Blob | null) => void }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-  return (
-    <div>
-      <p>Recipient signature</p>
-      <canvas
-        ref={ref}
-        width={560}
-        height={180}
-        aria-label="Recipient signature"
-        style={{
-          width: '100%',
-          maxWidth: 560,
-          height: 180,
-          touchAction: 'none',
-          border: '1px solid var(--border, #aaa)',
-        }}
-        onPointerDown={(e) => {
-          const canvas = e.currentTarget;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-          drawing.current = true;
-          canvas.setPointerCapture(e.pointerId);
-          const rect = canvas.getBoundingClientRect();
-          ctx.beginPath();
-          ctx.moveTo(((e.clientX - rect.left) * canvas.width) / rect.width, e.clientY - rect.top);
-        }}
-        onPointerMove={(e) => {
-          if (!drawing.current) return;
-          const canvas = e.currentTarget;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-          const rect = canvas.getBoundingClientRect();
-          ctx.lineWidth = 2;
-          ctx.lineTo(((e.clientX - rect.left) * canvas.width) / rect.width, e.clientY - rect.top);
-          ctx.stroke();
-        }}
-        onPointerUp={(e) => {
-          if (!drawing.current) return;
-          drawing.current = false;
-          e.currentTarget.toBlob(onChange, 'image/png');
-        }}
-      />
-      <Button
-        variant="tertiary"
-        onClick={() => {
-          const canvas = ref.current;
-          canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
-          onChange(null);
-        }}
-      >
-        Clear signature
-      </Button>
-    </div>
-  );
+
+// crypto.randomUUID needs a secure context; a phone on plain HTTP over the LAN is not one.
+function newEventId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
