@@ -9,12 +9,14 @@ export default defineConfig({
     react(),
     // SYSTEM_DESIGN §8.1: the service worker precaches the app shell only, so the app reloads with
     // no signal. API responses are never cached here; Dexie is the only offline data source.
+    // New versions wait for the user (src/lib/pwa.tsx registers and prompts). The driver and
+    // loader manifests are static files in public/, linked per workspace.
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      registerType: 'prompt',
+      injectRegister: false,
       manifest: false,
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,webmanifest}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [],

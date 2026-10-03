@@ -863,3 +863,28 @@ kbd {
   display: grid;
   gap: var(--space-8);
 }
+
+/* New app version ready (service worker update prompt). Above every workspace, clear of the
+   driver's thumb zone. */
+.wp-update {
+  position: fixed;
+  top: max(var(--space-12), env(safe-area-inset-top));
+  left: 50%;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  width: min(560px, calc(100% - 2 * var(--space-16)));
+  padding: var(--space-12) var(--space-12) var(--space-12) var(--space-16);
+  border-radius: var(--radius-nested);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+  font-size: var(--text-body);
+  box-shadow: var(--shadow-float);
+  transform: translateX(-50%);
+}
+
+.wp-update-text {
+  flex: 1;
+  min-width: 0;
+}
