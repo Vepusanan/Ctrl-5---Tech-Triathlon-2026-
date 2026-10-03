@@ -109,9 +109,9 @@ const minutes = (time: string) => {
 const TIGHT_WINDOW_MIN = 120;
 
 // The API has no outlet names, so pages show brand and district beside the outlet code.
-export const outletLabel = (brand: string, district: string) => `${brand} ${district}`;
+const outletLabel = (brand: string, district: string) => `${brand} ${district}`;
 
-export function queueTags(item: PlanningQueueItem): QueueTag[] {
+function queueTags(item: PlanningQueueItem): QueueTag[] {
   const { outlet } = item;
   const window = outlet.mallWindow ?? outlet.window;
   const tags: QueueTag[] = [];

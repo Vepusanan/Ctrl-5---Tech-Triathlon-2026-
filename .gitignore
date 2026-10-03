@@ -1,6 +1,6 @@
 # Confidential competition datasets (SYSTEM_DESIGN §12.4)
-data/*
-!data/.gitkeep
+/data/*
+!/data/.gitkeep
 
 # Dependencies
 node_modules/

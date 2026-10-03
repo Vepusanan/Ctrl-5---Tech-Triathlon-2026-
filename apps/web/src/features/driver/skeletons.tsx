@@ -5,7 +5,7 @@ import { DriverHeader, InverseCard } from './shell';
 // `driver-*` classes as the loaded screens, so cards keep their place when the data arrives.
 
 /** Header for a screen whose title comes from the data: the back button is real. */
-export function HeaderSkeleton({ back, backLabel }: { back: string; backLabel: string }) {
+function HeaderSkeleton({ back, backLabel }: { back: string; backLabel: string }) {
   return (
     <DriverHeader
       back={back}

@@ -79,7 +79,10 @@ export function SkeletonCard({
   );
 }
 
-/** Stands in for a `MetricCard`: the number on top, the label below. */
+/**
+ * Stands in for a `MetricCard`: the number on top, the label below.
+ * @public
+ */
 export function SkeletonMetric() {
   return (
     <article className="wp-card wp-metric">

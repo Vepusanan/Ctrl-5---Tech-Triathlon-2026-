@@ -190,7 +190,7 @@ let savedViews: SavedView[] = [
 ];
 let nextViewId = 5;
 
-export const dispatchRoutes: MockRoute[] = [
+const dispatchRoutes: MockRoute[] = [
   ...planningRoutes,
   ...deferralRoutes,
   ...liveRoutes,

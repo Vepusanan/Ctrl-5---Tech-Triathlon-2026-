@@ -13,7 +13,7 @@ export { HttpError, message, noContent };
  *
  * `VITE_DISPATCH_FIXTURES=all` skips step 1, which shows every page with the Figma scenario.
  */
-export interface SourceRequest {
+interface SourceRequest {
   params: Record<string, string>;
   query: URLSearchParams;
   body: unknown;
